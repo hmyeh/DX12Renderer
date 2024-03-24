@@ -1,12 +1,5 @@
 #include "application.h"
 
-
-// D3D12 extension library.
-#include <d3dx12.h>
-#include <DirectXMath.h>
-
-#include "dx12_api.h"
-
 #include <functional>
 
 
@@ -18,23 +11,15 @@ Application::Application(HINSTANCE hInstance, const wchar_t* instance_name, uint
     // be rendered in a DPI sensitive fashion.
     SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-    // Check for DirectX Math library support.
-    if (!DirectX::XMVerifyCPUSupport())
-    {
-        MessageBoxA(NULL, "Failed to verify DirectX Math library support.", "Error", MB_OK | MB_ICONERROR);
-        throw std::exception();
-    }
-
-    directx::EnableDebugLayer();
-
-    //m_tearing_supported = directx::CheckTearingSupport();
-
     // Assign member update function to Window
     auto update_fn = std::bind(&Application::WndProc, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
     m_window = std::unique_ptr<Window>(new Window(hInstance, instance_name, width, height, update_fn, fullscreen));
 
 
-    m_renderer = std::unique_ptr<Renderer>(new Renderer(m_window->getWindowHandle(), width, height, use_warp));
+    m_renderer = std::unique_ptr<Renderer>(new Renderer(m_window->GetWindowHandle(), width, height, use_warp));
+
+    m_scene = std::make_unique<Scene>();
+    m_scene->Init();
 
     m_initialized = true;
 }
@@ -52,7 +37,7 @@ LRESULT CALLBACK Application::WndProc(HWND hwnd, UINT message, WPARAM wParam, LP
     {
     case WM_PAINT:
         update();
-        m_renderer->render();
+        m_renderer->Render(*m_scene);
         break;
     case WM_SYSKEYDOWN:
     case WM_KEYDOWN:
@@ -62,7 +47,7 @@ LRESULT CALLBACK Application::WndProc(HWND hwnd, UINT message, WPARAM wParam, LP
         switch (wParam)
         {
         case 'V':
-            m_renderer->toggleVsync();
+            m_renderer->ToggleVsync();
             break;
         case VK_ESCAPE:
             ::PostQuitMessage(0);
@@ -71,7 +56,7 @@ LRESULT CALLBACK Application::WndProc(HWND hwnd, UINT message, WPARAM wParam, LP
             if (alt)
             {
         case VK_F11:
-            m_window->toggleFullscreen();
+            m_window->ToggleFullscreen();
             }
             break;
         }
@@ -84,12 +69,12 @@ LRESULT CALLBACK Application::WndProc(HWND hwnd, UINT message, WPARAM wParam, LP
         break;
     case WM_SIZE:
     {
-        if (m_window->resize()) {
-            uint32_t width = m_window->getWidth();
-            uint32_t height = m_window->getHeight();
+        if (m_window->Resize()) {
+            uint32_t width = m_window->GetWidth();
+            uint32_t height = m_window->GetHeight();
 
-            m_renderer->resize(width, height);
-            m_renderer->resizeDepthBuffer(width, height);
+            m_renderer->Resize(width, height);
+            m_renderer->ResizeDepthBuffer(width, height);
         }
 
         //resize();

@@ -6,6 +6,8 @@
 
 #include <queue>
 
+#include "commandlist.h"
+
 #if defined(max)
 #undef max
 #endif
@@ -21,7 +23,6 @@ public:
 	};
 
 	using CommandAllocatorQueue = std::queue<CommandAllocatorEntry>;
-	using CommandListQueue = std::queue< Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> >;
 
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_command_queue;
 	D3D12_COMMAND_LIST_TYPE m_command_list_type;
@@ -32,23 +33,23 @@ public:
 	HANDLE m_fence_event;
 
 	CommandAllocatorQueue m_command_allocator_queue;
-	CommandListQueue m_command_list_queue;
+	std::queue<CommandList> m_command_list_queue;
 
 	CommandQueue(D3D12_COMMAND_LIST_TYPE type);
 
 	virtual ~CommandQueue() {}
 
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> getCommandList();
+	CommandList GetCommandList();
 
-	uint64_t executeCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> command_list);
+	uint64_t ExecuteCommandList(CommandList& command_list);
 	
-	uint64_t signal();
-	bool isFenceComplete(uint64_t fence_value) { return m_fence->GetCompletedValue() >= fence_value; }
+	uint64_t Signal();
+	bool IsFenceComplete(uint64_t fence_value) { return m_fence->GetCompletedValue() >= fence_value; }
 
-	void waitForFenceValue(uint64_t fence_value);
+	void WaitForFenceValue(uint64_t fence_value);
 
 
-	void flush();
+	void Flush();
 
-	Microsoft::WRL::ComPtr<ID3D12CommandQueue> getD12CommandQueue() const { return m_command_queue; }
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetD12CommandQueue() const { return m_command_queue; }
 };

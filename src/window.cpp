@@ -93,7 +93,7 @@ HWND Window::CreateWindow(HINSTANCE hInst, const wchar_t* windowTitle, uint32_t 
 
 /// Window Functions
 
-void Window::show()
+void Window::Show()
 {
     ::ShowWindow(m_hWnd, SW_SHOW);
 
@@ -109,7 +109,7 @@ void Window::show()
 }
 
 
-void Window::toggleFullscreen()
+void Window::ToggleFullscreen()
 {
     m_fullscreen = !m_fullscreen;
 
@@ -158,7 +158,7 @@ void Window::toggleFullscreen()
     }
 }
 
-bool Window::resize()
+bool Window::Resize()
 {
     RECT clientRect = {};
     ::GetClientRect(m_hWnd, &clientRect);
@@ -168,8 +168,8 @@ bool Window::resize()
 
     if (m_width != width || m_height != height) 
     {
-        setWidth(width);
-        setHeight(height);
+        SetWidth(width);
+        SetHeight(height);
         return true;
     }
     return false;

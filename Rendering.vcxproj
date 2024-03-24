@@ -20,22 +20,28 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\application.cpp" />
+    <ClCompile Include="src\buffer.cpp" />
+    <ClCompile Include="src\commandlist.cpp" />
     <ClCompile Include="src\commandqueue.cpp" />
     <ClCompile Include="src\dx12_api.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\mesh.cpp" />
     <ClCompile Include="src\renderer.cpp" />
     <ClCompile Include="src\scene.cpp" />
+    <ClCompile Include="src\texture.cpp" />
     <ClCompile Include="src\window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\application.h" />
+    <ClInclude Include="src\buffer.h" />
     <ClInclude Include="src\camera.h" />
+    <ClInclude Include="src\commandlist.h" />
     <ClInclude Include="src\commandqueue.h" />
     <ClInclude Include="src\dx12_api.h" />
     <ClInclude Include="src\mesh.h" />
     <ClInclude Include="src\renderer.h" />
     <ClInclude Include="src\scene.h" />
+    <ClInclude Include="src\texture.h" />
     <ClInclude Include="src\utility.h" />
     <ClInclude Include="src\window.h" />
   </ItemGroup>
@@ -131,13 +137,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>E:\Rendering\external\DirectX-Headers\include\directx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Rendering\external\DirectXTex\DirectXTex;E:\Rendering\external\DirectX-Headers\include\directx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;D3DCompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;D3DCompiler.lib;DirectXTex.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>E:\Rendering\external\DirectXTex\DirectXTex\Bin\Windows10_2022\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <FxCompile>
       <ShaderModel>6.5</ShaderModel>

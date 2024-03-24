@@ -10,14 +10,16 @@
 #include "utility.h"
 #include "dx12_api.h"
 #include "commandqueue.h"
-#include "scene.h"
+
 #include "camera.h"
 
+// Forward declaration
+class Scene;
 
 // PSO
 // TODO: pipeline factory?
 class Pipeline {
-public:
+private:
     // Root signature
     Microsoft::WRL::ComPtr<ID3D12RootSignature> m_root_signature;
 
@@ -26,28 +28,22 @@ public:
 
     D3D12_VIEWPORT* m_viewport;
     D3D12_RECT* m_scissor_rect;
-
-    D3D12_CPU_DESCRIPTOR_HANDLE* m_render_target_view; 
-    D3D12_CPU_DESCRIPTOR_HANDLE* m_depth_stencil_view;
-
+    
+public:
     Pipeline(D3D12_VIEWPORT* viewport, D3D12_RECT* scissor_rect);
 
+    //void ClearRenderTarget(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> command_list, ID3D12Resource* render_buffer, D3D12_CPU_DESCRIPTOR_HANDLE* render_target_view, D3D12_CPU_DESCRIPTOR_HANDLE* depth_stencil_view);
 
-    // Set rendertarget(s)
-    //void SetRenderTarget(D3D12_CPU_DESCRIPTOR_HANDLE* render_target_view, D3D12_CPU_DESCRIPTOR_HANDLE* depth_stencil_view) {
-
-    //}
-
-    void ClearRenderTarget(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> command_list, ID3D12Resource* render_buffer, D3D12_CPU_DESCRIPTOR_HANDLE* render_target_view, D3D12_CPU_DESCRIPTOR_HANDLE* depth_stencil_view);
-
-    // bind the meshes from the scene here, since the actual renderer doesnt need to see it actually
-    void RenderSceneToTarget(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> command_list, const Scene& scene, const Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE* render_target_view, D3D12_CPU_DESCRIPTOR_HANDLE* depth_stencil_view);
+    void RenderSceneToTarget(unsigned int frame_idx, CommandList& command_list, Scene& scene, const Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE* render_target_view, D3D12_CPU_DESCRIPTOR_HANDLE* depth_stencil_view);
 };
+
+
 
 class Renderer {
 public:
-    static const unsigned int s_num_frames = 3;
+    static constexpr unsigned int s_num_frames = 3;
 
+private:
     // Making below a singleton
     static Microsoft::WRL::ComPtr<ID3D12Device2> DEVICE;
 
@@ -68,17 +64,12 @@ public:
     // direct queue
     CommandQueue m_command_queue;
 
-    
-
     uint64_t m_frame_fence_values[s_num_frames] = {};
-
 
     std::unique_ptr<Pipeline> m_pipeline;
 
     D3D12_VIEWPORT m_viewport;
     D3D12_RECT m_scissor_rect;
-
-
     
     // By default, enable V-Sync.
     // Can be toggled with the V key.
@@ -86,28 +77,21 @@ public:
     bool m_tearing_supported = false;
 
     Camera m_camera;
-    Scene m_scene;
 
+public:
     Renderer(HWND hWnd, uint32_t width, uint32_t height, bool use_warp = false);
-
     ~Renderer();
 
     // Singleton device
     static Microsoft::WRL::ComPtr<ID3D12Device2> GetDevice();
 
-
     void UpdateRenderTargetViews();
+    void Render(Scene& scene);
 
-    void render();
+    void Resize(uint32_t width, uint32_t height);
+    void ResizeDepthBuffer(uint32_t width, uint32_t height);
 
-
-    void resize(uint32_t width, uint32_t height);
-
-    void resizeDepthBuffer(uint32_t width, uint32_t height);
-
-    void toggleVsync() {
-        m_vsync = !m_vsync;
-    }
+    void ToggleVsync() { m_vsync = !m_vsync; }
 };
 
 

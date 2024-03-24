@@ -8,24 +8,24 @@ cbuffer ModelViewProjectionCB : register(b0)
     matrix Projection;
 }
 
-struct VertexPosColor
+struct Vertex
 {
     float3 Position : POSITION;
-    float3 Color : COLOR;
+    float2 TextureCoord : TEXTURE_COORD;
 };
 
 struct VertexShaderOutput
 {
-    float4 Color : COLOR;
+    float2 TextureCoord : TEXTURE_COORD;
     float4 Position : SV_Position;
 };
 
-VertexShaderOutput main(VertexPosColor IN)
+VertexShaderOutput main(Vertex IN)
 {
     VertexShaderOutput OUT;
     
     OUT.Position = mul(float4(IN.Position, 1.0f), mul(mul(Model, View), Projection));
-    OUT.Color = float4(IN.Color, 1.0f);
+    OUT.TextureCoord = IN.TextureCoord;
 
     return OUT;
 }

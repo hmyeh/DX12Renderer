@@ -9,8 +9,6 @@
 #include <stdint.h>
 
 
-
-
 namespace directx {
 	void EnableDebugLayer();
 
