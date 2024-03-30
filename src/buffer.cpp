@@ -27,17 +27,13 @@ void UploadBuffer::Create(size_t buffer_size)
 
 // Gpu Buffer
 
-// Declare the GpuBuffer types to be used to avoid Linker errors https://isocpp.org/wiki/faq/templates#separate-template-fn-defn-from-decl
-template class GpuBuffer<Vertex>;
-template class GpuBuffer<uint32_t>;
-
 template <class T>
-void GpuBuffer<T>::Create(size_t resource_size) 
+void GpuBuffer<T>::Create(size_t num_elements) 
 {
     // Destroy any previous resource
     Destroy();
 
-    m_buffer_size = resource_size;
+    m_buffer_size = num_elements * sizeof(T);
 
     Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
 
@@ -68,24 +64,60 @@ void GpuBuffer<T>::Upload(CommandList& command_list, const std::vector<T>& buffe
     command_list.UploadBufferData(m_buffer_size, this->GetResource(), 1, &subresource_data);
 }
 
+// c++20 requires clause
 template <class T>
-D3D12_VERTEX_BUFFER_VIEW GpuBuffer<T>::GetVertexBufferView() const 
+D3D12_VERTEX_BUFFER_VIEW GpuBuffer<T>::GetVertexBufferView() const requires IsVertex<T> 
 {
     // Create the vertex buffer view.
-    D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view;
+    D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view{};
     vertex_buffer_view.BufferLocation = m_resource->GetGPUVirtualAddress();
-    vertex_buffer_view.SizeInBytes = m_buffer_size;
-    vertex_buffer_view.StrideInBytes = sizeof(Vertex);
+    vertex_buffer_view.SizeInBytes = CastSize_tToUint(m_buffer_size);
+    vertex_buffer_view.StrideInBytes = sizeof(T);
     return vertex_buffer_view;
 }
+//template <>
+//D3D12_VERTEX_BUFFER_VIEW GpuBuffer<ScreenVertex>::GetVertexBufferView() const
+//{
+//    // Create the vertex buffer view.
+//    D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view{};
+//    vertex_buffer_view.BufferLocation = m_resource->GetGPUVirtualAddress();
+//    vertex_buffer_view.SizeInBytes = m_buffer_size;
+//    vertex_buffer_view.StrideInBytes = sizeof(ScreenVertex);
+//    return vertex_buffer_view;
+//}
+//
+//template <>
+//D3D12_VERTEX_BUFFER_VIEW GpuBuffer<Vertex>::GetVertexBufferView() const 
+//{
+//    // Create the vertex buffer view.
+//    D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view{};
+//    vertex_buffer_view.BufferLocation = m_resource->GetGPUVirtualAddress();
+//    vertex_buffer_view.SizeInBytes = m_buffer_size;
+//    vertex_buffer_view.StrideInBytes = sizeof(Vertex);
+//    return vertex_buffer_view;
+//}
 
 template <class T>
-D3D12_INDEX_BUFFER_VIEW GpuBuffer<T>::GetIndexBufferView() const 
+D3D12_INDEX_BUFFER_VIEW GpuBuffer<T>::GetIndexBufferView() const requires IsIndex<T>
 {
-    D3D12_INDEX_BUFFER_VIEW index_buffer_view;
+    D3D12_INDEX_BUFFER_VIEW index_buffer_view{};
     index_buffer_view.BufferLocation = m_resource->GetGPUVirtualAddress();
-    index_buffer_view.Format = DXGI_FORMAT_R32_UINT; // should check template class T type
-    index_buffer_view.SizeInBytes = m_buffer_size;
+    index_buffer_view.Format = DXGI_FORMAT_R32_UINT; // Should check Type num bits
+    index_buffer_view.SizeInBytes = CastSize_tToUint(m_buffer_size);
     return index_buffer_view;
 }
 
+//template <>
+//D3D12_INDEX_BUFFER_VIEW GpuBuffer<uint32_t>::GetIndexBufferView() const 
+//{
+//    D3D12_INDEX_BUFFER_VIEW index_buffer_view{};
+//    index_buffer_view.BufferLocation = m_resource->GetGPUVirtualAddress();
+//    index_buffer_view.Format = DXGI_FORMAT_R32_UINT;
+//    index_buffer_view.SizeInBytes = m_buffer_size;
+//    return index_buffer_view;
+//}
+
+// Declare the GpuBuffer types to be used to avoid Linker errors https://isocpp.org/wiki/faq/templates#separate-template-fn-defn-from-decl
+template class GpuBuffer<ScreenVertex>;
+template class GpuBuffer<Vertex>;
+template class GpuBuffer<uint32_t>;

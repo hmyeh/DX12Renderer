@@ -3,7 +3,6 @@
 #include "renderer.h"
 #include "utility.h"
 #include "dx12_api.h"
-#include "buffer.h"
 
 CommandList::CommandList(Microsoft::WRL::ComPtr<ID3D12CommandAllocator> command_allocator, D3D12_COMMAND_LIST_TYPE command_list_type) :
 	m_command_allocator(command_allocator), m_command_list_type(command_list_type)

@@ -2,15 +2,11 @@
 
 #include "renderer.h"
 
-Scene::Scene() : 
-	m_command_queue(CommandQueue(D3D12_COMMAND_LIST_TYPE_COPY)), m_texture_manager(TextureManager(1)), m_num_frame_descriptors(1 + 1) // 1 srv diffuse texture (will be changed every model/mesh) + 1 cbv * framecount
+Scene::Scene() :
+	m_command_queue(CommandQueue(D3D12_COMMAND_LIST_TYPE_COPY)), m_num_frame_descriptors(1 + 1) // 1 srv diffuse texture (will be changed every model/mesh) + 1 cbv * framecount
 {
     Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
     m_cbv_srv_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-    Texture* tex = m_texture_manager.Read(L"E:/Rendering/resource/test.dds");
-
-    m_meshes.push_back(Mesh::Read(tex));
 }
 
 Scene::~Scene() 
@@ -18,9 +14,12 @@ Scene::~Scene()
 	m_command_queue.Flush();
 }
 
-void Scene::Init() {
+void Scene::Load() {
+    // for now set here
+    m_meshes.push_back(Mesh::ReadFile("resource/box.obj", &m_texture_library));
+
     // Load all textures needs to be done after all descriptors have been allocated
-    m_texture_manager.Load();
+    m_texture_library.Load();
 
     // load mesh data from cpu to gpu
     for (auto& mesh : m_meshes) {

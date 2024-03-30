@@ -12,6 +12,7 @@
 #include "commandqueue.h"
 
 #include "camera.h"
+#include "texture.h"
 
 // Forward declaration
 class Scene;
@@ -29,8 +30,10 @@ private:
     D3D12_VIEWPORT* m_viewport;
     D3D12_RECT* m_scissor_rect;
     
+    TextureLibrary* m_texture_library;
+
 public:
-    Pipeline(D3D12_VIEWPORT* viewport, D3D12_RECT* scissor_rect);
+    Pipeline(D3D12_VIEWPORT* viewport, D3D12_RECT* scissor_rect, TextureLibrary* texture_library);
 
     //void ClearRenderTarget(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> command_list, ID3D12Resource* render_buffer, D3D12_CPU_DESCRIPTOR_HANDLE* render_target_view, D3D12_CPU_DESCRIPTOR_HANDLE* depth_stencil_view);
 
@@ -77,6 +80,7 @@ private:
     bool m_tearing_supported = false;
 
     Camera m_camera;
+    TextureLibrary m_texture_library;
 
 public:
     Renderer(HWND hWnd, uint32_t width, uint32_t height, bool use_warp = false);

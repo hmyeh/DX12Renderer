@@ -15,11 +15,10 @@ Application::Application(HINSTANCE hInstance, const wchar_t* instance_name, uint
     auto update_fn = std::bind(&Application::WndProc, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
     m_window = std::unique_ptr<Window>(new Window(hInstance, instance_name, width, height, update_fn, fullscreen));
 
-
     m_renderer = std::unique_ptr<Renderer>(new Renderer(m_window->GetWindowHandle(), width, height, use_warp));
 
     m_scene = std::make_unique<Scene>();
-    m_scene->Init();
+    m_scene->Load();
 
     m_initialized = true;
 }

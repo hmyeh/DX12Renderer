@@ -10,6 +10,7 @@
 #include "window.h"
 #include "renderer.h"
 #include "scene.h"
+#include "texture.h"
 
 class Application {
 private:

@@ -30,43 +30,51 @@ public:
 };
 
 
-class IBuffer {
-public:
-    virtual void Create(size_t buffer_size) = 0;
-};
-
 // Used to upload texture and mesh data to the GPU via Commited resources
-class UploadBuffer : public GpuResource, public IBuffer {
+class UploadBuffer : public GpuResource {
 public:
     UploadBuffer() {
 
     }
 
-    virtual void Create(size_t buffer_size) override;
+    void Create(size_t buffer_size);
 };
 
 
 // Define vertex
+struct ScreenVertex
+{
+    DirectX::XMFLOAT2 position;
+    DirectX::XMFLOAT2 texture_coord;
+};
+
+
 struct Vertex
 {
     DirectX::XMFLOAT3 position;
     DirectX::XMFLOAT2 texture_coord;
-    // Normal
+    DirectX::XMFLOAT3 normal;
 };
 
+// Concept to ensure vertex type struct is used for Meshes
+template<class T>
+concept IsVertex = std::is_class_v<Vertex> || std::is_class_v<ScreenVertex>;
+
+template<class T>
+concept IsIndex = std::is_unsigned_v<T>;
 
 template <class T>
-class GpuBuffer : public GpuResource, public IBuffer {
-    uint32_t m_buffer_size;
+class GpuBuffer : public GpuResource {
+    size_t m_buffer_size;
 
 public:
     GpuBuffer() : m_buffer_size(0) {}
 
-    virtual void Create(size_t resource_size) override;
+    void Create(size_t num_elements);
     void Upload(CommandList& command_list, const std::vector<T>& buffer_data);
 
 
-    D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView() const;
-    D3D12_INDEX_BUFFER_VIEW GetIndexBufferView() const;
+    D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView() const requires IsVertex<T>;
+    D3D12_INDEX_BUFFER_VIEW GetIndexBufferView() const requires IsIndex<T>;
 
 };

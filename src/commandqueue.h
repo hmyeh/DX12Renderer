@@ -5,7 +5,6 @@
 #include <wrl.h>
 
 #include <queue>
-
 #include "commandlist.h"
 
 #if defined(max)

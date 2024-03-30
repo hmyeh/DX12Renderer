@@ -5,8 +5,8 @@
 
 /// Pipeline
 
-Pipeline::Pipeline(D3D12_VIEWPORT* viewport, D3D12_RECT* scissor_rect) :
-    m_viewport(viewport), m_scissor_rect(scissor_rect)
+Pipeline::Pipeline(D3D12_VIEWPORT* viewport, D3D12_RECT* scissor_rect, TextureLibrary* texture_library) :
+    m_viewport(viewport), m_scissor_rect(scissor_rect), m_texture_library(texture_library)
 {
     Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
 
@@ -143,7 +143,7 @@ void Pipeline::RenderSceneToTarget(unsigned int frame_idx, CommandList& command_
         command_list.SetGraphicsRootDescriptorTable(0, scene.GetDiffuseTextureHandle(frame_idx));
 
         // Draw
-        command_list.DrawIndexedInstanced(mesh.GetNumIndices(), 1);
+        command_list.DrawIndexedInstanced(CastSize_tToUint(mesh.GetNumIndices()), 1);
     }
 }
 
@@ -161,7 +161,6 @@ Renderer::Renderer(HWND hWnd, uint32_t width, uint32_t height, bool use_warp) :
 {
     m_tearing_supported = directx::CheckTearingSupport();
 
-
     Microsoft::WRL::ComPtr<ID3D12Device2> device = GetDevice();
 
     m_swap_chain = directx::CreateSwapChain(hWnd, m_command_queue.GetD12CommandQueue(), width, height, s_num_frames);
@@ -178,7 +177,8 @@ Renderer::Renderer(HWND hWnd, uint32_t width, uint32_t height, bool use_warp) :
     ResizeDepthBuffer(width, height);
 
     // create pipeline
-    m_pipeline = std::unique_ptr<Pipeline>(new Pipeline(&m_viewport, &m_scissor_rect));
+    m_pipeline = std::unique_ptr<Pipeline>(new Pipeline(&m_viewport, &m_scissor_rect, &m_texture_library));
+
 }
 
 Renderer::~Renderer() {

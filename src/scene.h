@@ -35,14 +35,14 @@ private:
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_cbv_srv_heap;
 
     // Texturemanager allocates the non-shader visible heap descriptors, texture can then be bound afterwards to copy the descriptor to shader visible heap
-    TextureManager m_texture_manager;
+    TextureLibrary m_texture_library;
 public:
 	Scene();
 	~Scene();
 
 
     // create the gpu/upload buffers needed for the 
-    void Init();
+    void Load();
 
     // Update the scene constant buffer for the current frame index
     void Update(unsigned int frame_idx, const Camera& camera);
@@ -59,8 +59,8 @@ public:
     ID3D12DescriptorHeap* GetCbvSrvHeap() { return m_cbv_srv_heap.Get(); }
     D3D12_GPU_DESCRIPTOR_HANDLE GetSceneConstantsHandle(unsigned int frame_idx) const {  return m_scene_cbv_handles[frame_idx]; }
 
-    ID3D12DescriptorHeap* GetTextureSamplers() { return m_texture_manager.GetSamplerHeap(); }
-    D3D12_GPU_DESCRIPTOR_HANDLE GetTextureSamplersHandle() const { return m_texture_manager.GetSamplerHeapGpuHandle(); }
+    ID3D12DescriptorHeap* GetTextureSamplers() { return m_texture_library.GetSamplerHeap(); }
+    D3D12_GPU_DESCRIPTOR_HANDLE GetTextureSamplersHandle() const { return m_texture_library.GetSamplerHeapGpuHandle(); }
 
     const std::vector<Mesh>& GetItems() const { return m_meshes; }
 

@@ -6,6 +6,11 @@
 #include <DirectXMath.h>
 #include <cstdio>
 
+//#include <locale>
+//#include <codecvt>
+#include <string>
+#include <stdlib.h>
+
 // From DXSampleHelper.h 
 // Source: https://github.com/Microsoft/DirectX-Graphics-Samples
 inline void ThrowIfFailed(HRESULT hr)
@@ -16,6 +21,13 @@ inline void ThrowIfFailed(HRESULT hr)
     }
 }
 
+std::wstring to_wstring(std::string str);
+
+inline unsigned int CastSize_tToUint(size_t size) {
+    if (size > UINT_MAX)
+        throw std::exception("Failed to cast size_t to unsigned int due to size_t > UINT_MAX");
+    return static_cast<unsigned int>(size);
+}
 
 // print 4x4 matrix (note: XMMATRIX is stored row-major)
 inline void PrintMatrix(DirectX::XMMATRIX mat) 
@@ -30,3 +42,4 @@ inline void PrintMatrix(DirectX::XMMATRIX mat)
         mat_view._41, mat_view._42, mat_view._43, mat_view._44);
     OutputDebugString(buffer);
 }
+

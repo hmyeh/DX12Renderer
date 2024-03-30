@@ -38,7 +38,7 @@ void Texture::Create(DirectX::TEX_DIMENSION dimensions, DXGI_FORMAT format, uint
         IID_PPV_ARGS(&m_resource)));
 
     //m_srv_handle = srv_handle;
-    CreateViews();
+    //CreateViews(); // turned off now since setting in texturelibrary after allocating descriptors
 }
 
 void Texture::CreateViews() {
@@ -46,11 +46,11 @@ void Texture::CreateViews() {
         CD3DX12_RESOURCE_DESC desc(m_resource->GetDesc());
         Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
 
-        //if ((desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET) != 0)
-        //    device->CreateRenderTargetView(m_resource.Get(), nullptr, m_rtv_handle);
+        if ((desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET) != 0)
+            device->CreateRenderTargetView(m_resource.Get(), nullptr, m_rtv_handle);
 
-        //if ((desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) != 0)
-        //    device->CreateDepthStencilView(m_resource.Get(), nullptr, m_dsv_handle);
+        if ((desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) != 0)
+            device->CreateDepthStencilView(m_resource.Get(), nullptr, m_dsv_handle);
 
         if ((desc.Flags & D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE) == 0)
             device->CreateShaderResourceView(m_resource.Get(), nullptr, m_srv_handle);
@@ -102,54 +102,104 @@ void Texture::Read(const std::wstring& file_name)
     else if (file_path.extension() == ".tga")
         ThrowIfFailed(DirectX::LoadFromTGAFile(file_name.c_str(), &m_metadata, m_image));
     else
-        ThrowIfFailed(DirectX::LoadFromWICFile(file_name.c_str(), DirectX::WIC_FLAGS_FORCE_RGB, &m_metadata, m_image));
+        ThrowIfFailed(DirectX::LoadFromWICFile(file_name.c_str(), DirectX::WIC_FLAGS_NONE, &m_metadata, m_image));
 
     Create(m_metadata.dimension, m_metadata.format, m_metadata.width, m_metadata.height, m_metadata.depth, m_metadata.mipLevels);
 
 }
 
 // TODO: where to perform the resource barrier to pixel shader resource state? currently done here, so command queue is of type D3D12_COMMAND_LIST_TYPE_DIRECT
-TextureManager::TextureManager(unsigned int num_descriptors) : 
-    m_num_descriptors(num_descriptors), m_num_free_descriptors(num_descriptors), m_command_queue(CommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT))
+TextureLibrary::TextureLibrary() :
+    m_command_queue(CommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT))
 {
     Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
 
-    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
-    heapDesc.NumDescriptors = m_num_descriptors;
-    heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    ThrowIfFailed(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_desc_heap)));
-
     m_srv_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    m_rtv_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    m_dsv_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
     m_sampler_heap = CreateSamplers();
 }
 
-Texture* TextureManager::Read(std::wstring file_name) 
-{
-    auto result = m_texture_map.find(file_name);
-    if (result != m_texture_map.end()) {
-        return result->second.get();
+void TextureLibrary::AllocateDescriptors() {
+    Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
+
+    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+    heapDesc.NumDescriptors = m_srv_texture_map.size() + m_rtv_textures.size() + m_dsv_textures.size();
+    heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    ThrowIfFailed(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_srv_heap)));
+
+    heapDesc.NumDescriptors = m_rtv_textures.size();
+    heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+    ThrowIfFailed(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_rtv_heap)));
+
+    heapDesc.NumDescriptors = m_dsv_textures.size();
+    heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+    ThrowIfFailed(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_dsv_heap)));
+
+    // Set the Shader Resource View 
+    CD3DX12_CPU_DESCRIPTOR_HANDLE srv_cpu_handle(m_srv_heap->GetCPUDescriptorHandleForHeapStart());
+    for (const auto& [name, texture] : m_srv_texture_map) {
+        texture->SetSrvHandle(srv_cpu_handle);
+        texture->CreateViews();
+        srv_cpu_handle.Offset(m_srv_descriptor_size);
     }
 
-    // There is no descriptor space in the created heap...
-    if (m_num_free_descriptors == 0) {
-        throw std::exception("No space available to allocate texture descriptor");
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtv_cpu_handle(m_rtv_heap->GetCPUDescriptorHandleForHeapStart());
+    for (auto& texture : m_rtv_textures) {
+        texture->SetRtvHandle(rtv_cpu_handle);
+        texture->SetSrvHandle(srv_cpu_handle);
+        texture->CreateViews();
+        rtv_cpu_handle.Offset(m_rtv_descriptor_size);
+        srv_cpu_handle.Offset(m_srv_descriptor_size);
     }
 
-    CD3DX12_CPU_DESCRIPTOR_HANDLE srv_cpu_handle(m_desc_heap->GetCPUDescriptorHandleForHeapStart());
-    srv_cpu_handle.Offset(m_num_descriptors - m_num_free_descriptors);
-    std::unique_ptr<Texture> texture = std::unique_ptr<Texture>(new Texture(srv_cpu_handle));
-    texture->Read(file_name);
-    m_texture_map.insert(std::make_pair(file_name, std::move(texture)));
-    --m_num_free_descriptors;
-    return m_texture_map[file_name].get();
+    CD3DX12_CPU_DESCRIPTOR_HANDLE dsv_cpu_handle(m_dsv_heap->GetCPUDescriptorHandleForHeapStart());
+    for (auto& texture : m_rtv_textures) {
+        texture->SetDsvHandle(dsv_cpu_handle);
+        texture->SetSrvHandle(srv_cpu_handle);
+        texture->CreateViews();
+        dsv_cpu_handle.Offset(m_dsv_descriptor_size);
+        srv_cpu_handle.Offset(m_srv_descriptor_size);
+    }
 }
 
-void TextureManager::Load() { // LOADING ALL TEXTURES AT ONCE
+Texture* TextureLibrary::CreateTexture(std::wstring file_name)
+{
+    auto result = m_srv_texture_map.find(file_name);
+    if (result != m_srv_texture_map.end()) {
+        return result->second.get();
+    }
+    
+    std::unique_ptr<Texture> texture = std::make_unique<Texture>();
+    texture->Read(file_name);
+    m_srv_texture_map.insert(std::make_pair(file_name, std::move(texture)));
+
+    return m_srv_texture_map[file_name].get();
+}
+
+Texture* TextureLibrary::CreateRenderTargetTexture(DXGI_FORMAT format, uint32_t width, uint32_t height) {
+    std::unique_ptr<Texture> texture = std::make_unique<Texture>();
+    texture->Create(DirectX::TEX_DIMENSION_TEXTURE2D, format, width, height, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+    m_rtv_textures.push_back(std::move(texture));
+    return m_rtv_textures.back().get();
+}
+
+Texture* TextureLibrary::CreateDepthTexture(DXGI_FORMAT format, uint32_t width, uint32_t height) {
+    std::unique_ptr<Texture> texture = std::make_unique<Texture>();
+    texture->Create(DirectX::TEX_DIMENSION_TEXTURE2D, format, width, height, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+    m_dsv_textures.push_back(std::move(texture));
+    return m_dsv_textures.back().get();
+}
+
+void TextureLibrary::Load() { // LOADING ALL TEXTURES AT ONCE
+    // Allocate the descriptors before loading
+    AllocateDescriptors();
+    // load textures
     Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
     auto command_list = m_command_queue.GetCommandList();
 
-    for (const auto& [name, texture] : m_texture_map) {
+    for (const auto& [name, texture] : m_srv_texture_map) {
         texture->Upload(command_list);
     }
 
@@ -158,7 +208,7 @@ void TextureManager::Load() { // LOADING ALL TEXTURES AT ONCE
 }
 
 
-Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> TextureManager::CreateSamplers() 
+Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> TextureLibrary::CreateSamplers()
 {
     Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
 
