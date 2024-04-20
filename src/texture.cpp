@@ -37,6 +37,8 @@ void Texture::Create(DirectX::TEX_DIMENSION dimensions, DXGI_FORMAT format, uint
         nullptr,
         IID_PPV_ARGS(&m_resource)));
 
+    // Set appropriate initial resource state
+    m_resource_state = D3D12_RESOURCE_STATE_COPY_DEST;
     //m_srv_handle = srv_handle;
     //CreateViews(); // turned off now since setting in texturelibrary after allocating descriptors
 }
@@ -78,8 +80,10 @@ void Texture::Upload(CommandList& command_list)
 
     uint64_t required_size = GetRequiredIntermediateSize(m_resource.Get(), 0, subresources.size());
 
+    // Upload data and update resource state
     command_list.UploadBufferData(required_size, m_resource.Get(), subresources.size(), subresources.data());
-    command_list.ResourceBarrier(m_resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    TransitionResourceState(command_list, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    //command_list.ResourceBarrier(m_resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 }
 
 void Texture::Bind(const D3D12_CPU_DESCRIPTOR_HANDLE& cpu_desc_handle) 
@@ -108,59 +112,47 @@ void Texture::Read(const std::wstring& file_name)
 
 }
 
+
+// set static samplers
+std::unique_ptr<DescriptorHeap> TextureLibrary::s_sampler_heap = TextureLibrary::CreateSamplers();
+
 // TODO: where to perform the resource barrier to pixel shader resource state? currently done here, so command queue is of type D3D12_COMMAND_LIST_TYPE_DIRECT
 TextureLibrary::TextureLibrary() :
     m_command_queue(CommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT))
 {
-    Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
-
-    m_srv_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_rtv_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-    m_dsv_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-
-    m_sampler_heap = CreateSamplers();
 }
 
 void TextureLibrary::AllocateDescriptors() {
     Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
 
-    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
-    heapDesc.NumDescriptors = m_srv_texture_map.size() + m_rtv_textures.size() + m_dsv_textures.size();
-    heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    ThrowIfFailed(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_srv_heap)));
-
-    heapDesc.NumDescriptors = m_rtv_textures.size();
-    heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    ThrowIfFailed(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_rtv_heap)));
-
-    heapDesc.NumDescriptors = m_dsv_textures.size();
-    heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-    ThrowIfFailed(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_dsv_heap)));
+    m_srv_heap = std::unique_ptr<DescriptorHeap>(new DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, m_srv_texture_map.size() + m_rtv_textures.size() + m_dsv_textures.size()));
+    m_rtv_heap = std::unique_ptr<DescriptorHeap>(new DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, m_rtv_textures.size()));
+    m_dsv_heap = std::unique_ptr<DescriptorHeap>(new DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, m_dsv_textures.size()));
 
     // Set the Shader Resource View 
-    CD3DX12_CPU_DESCRIPTOR_HANDLE srv_cpu_handle(m_srv_heap->GetCPUDescriptorHandleForHeapStart());
+    unsigned int current_num_srv_tex = 0;
     for (const auto& [name, texture] : m_srv_texture_map) {
-        texture->SetSrvHandle(srv_cpu_handle);
+        texture->SetSrvHandle(m_srv_heap->GetCpuHandle(current_num_srv_tex));
         texture->CreateViews();
-        srv_cpu_handle.Offset(m_srv_descriptor_size);
+        ++current_num_srv_tex;
     }
 
-    CD3DX12_CPU_DESCRIPTOR_HANDLE rtv_cpu_handle(m_rtv_heap->GetCPUDescriptorHandleForHeapStart());
+    unsigned int current_num_rtv_tex = 0;
     for (auto& texture : m_rtv_textures) {
-        texture->SetRtvHandle(rtv_cpu_handle);
-        texture->SetSrvHandle(srv_cpu_handle);
+        texture->SetRtvHandle(m_rtv_heap->GetCpuHandle(current_num_rtv_tex));
+        texture->SetSrvHandle(m_srv_heap->GetCpuHandle(current_num_srv_tex));
         texture->CreateViews();
-        rtv_cpu_handle.Offset(m_rtv_descriptor_size);
-        srv_cpu_handle.Offset(m_srv_descriptor_size);
+        ++current_num_rtv_tex;
+        ++current_num_srv_tex;
     }
 
-    CD3DX12_CPU_DESCRIPTOR_HANDLE dsv_cpu_handle(m_dsv_heap->GetCPUDescriptorHandleForHeapStart());
+    unsigned int current_num_dsv_tex = 0;
     for (auto& texture : m_rtv_textures) {
-        texture->SetDsvHandle(dsv_cpu_handle);
-        texture->SetSrvHandle(srv_cpu_handle);
+        texture->SetDsvHandle(m_dsv_heap->GetCpuHandle(current_num_dsv_tex));
+        texture->SetSrvHandle(m_srv_heap->GetCpuHandle(current_num_srv_tex));
         texture->CreateViews();
-        dsv_cpu_handle.Offset(m_dsv_descriptor_size);
-        srv_cpu_handle.Offset(m_srv_descriptor_size);
+        ++current_num_dsv_tex;
+        ++current_num_srv_tex;
     }
 }
 
@@ -208,25 +200,11 @@ void TextureLibrary::Load() { // LOADING ALL TEXTURES AT ONCE
 }
 
 
-Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> TextureLibrary::CreateSamplers()
+std::unique_ptr<DescriptorHeap> TextureLibrary::CreateSamplers()
 {
     Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
 
-    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> sampler_heap;
-
-    // Describe and create a sampler descriptor heap.
-    D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc = {};
-    samplerHeapDesc.NumDescriptors = 2;        // One clamp and one wrap sampler.
-    samplerHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
-    samplerHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    ThrowIfFailed(device->CreateDescriptorHeap(&samplerHeapDesc, IID_PPV_ARGS(&sampler_heap)));
-
-    ////// Create samplers
-    // Get the sampler descriptor size for the current device.
-    const UINT samplerDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
-
-    // Get a handle to the start of the descriptor heap.
-    CD3DX12_CPU_DESCRIPTOR_HANDLE sampler_handle(sampler_heap->GetCPUDescriptorHandleForHeapStart());
+    std::unique_ptr<DescriptorHeap> sampler_heap(new DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 2, true));
 
     // Describe and create the wrapping sampler, which is used for 
     // sampling diffuse/normal maps.
@@ -241,10 +219,7 @@ Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> TextureLibrary::CreateSamplers()
     wrap_sampler_desc.MaxAnisotropy = 1;
     wrap_sampler_desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
     wrap_sampler_desc.BorderColor[0] = wrap_sampler_desc.BorderColor[1] = wrap_sampler_desc.BorderColor[2] = wrap_sampler_desc.BorderColor[3] = 0;
-    device->CreateSampler(&wrap_sampler_desc, sampler_handle);
-
-    // Move the handle to the next slot in the descriptor heap.
-    sampler_handle.Offset(samplerDescriptorSize);
+    device->CreateSampler(&wrap_sampler_desc, sampler_heap->GetCpuHandle());
 
     // Describe and create the point clamping sampler, which is 
     // used for the shadow map.
@@ -259,7 +234,7 @@ Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> TextureLibrary::CreateSamplers()
     clamp_sampler_desc.BorderColor[0] = clamp_sampler_desc.BorderColor[1] = clamp_sampler_desc.BorderColor[2] = clamp_sampler_desc.BorderColor[3] = 0;
     clamp_sampler_desc.MinLOD = 0;
     clamp_sampler_desc.MaxLOD = D3D12_FLOAT32_MAX;
-    device->CreateSampler(&clamp_sampler_desc, sampler_handle);
+    device->CreateSampler(&clamp_sampler_desc, sampler_heap->GetCpuHandle(1));
 
-    return sampler_heap;
+    return std::move(sampler_heap);
 }

@@ -10,6 +10,7 @@
 
 #include "commandqueue.h"
 #include "buffer.h"
+#include "descriptorheap.h"
 
 class Texture : public GpuResource {
 private:
@@ -42,20 +43,17 @@ public:
 
 class TextureLibrary {
 public:
-    // for allocating the texture descriptors of different types
-    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_srv_heap;
-    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_rtv_heap;
-    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_dsv_heap;
+    // for allocating the texture descriptors of different types (non-shader visible)
+    std::unique_ptr<DescriptorHeap> m_srv_heap;
+    std::unique_ptr<DescriptorHeap> m_rtv_heap;
+    std::unique_ptr<DescriptorHeap> m_dsv_heap;
 
-    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_sampler_heap;
+    // for now static since using the same samplers
+    static std::unique_ptr<DescriptorHeap> s_sampler_heap;
 
     std::map<std::wstring, std::unique_ptr<Texture>> m_srv_texture_map;
     std::vector<std::unique_ptr<Texture>> m_rtv_textures; // might be changed later to have name/id associated
     std::vector<std::unique_ptr<Texture>> m_dsv_textures;
-
-    unsigned int m_srv_descriptor_size;
-    unsigned int m_rtv_descriptor_size;
-    unsigned int m_dsv_descriptor_size;
 
     // Commandqueue for copying
     CommandQueue m_command_queue;
@@ -76,14 +74,14 @@ public:
     // Loading all textures to GPU at once
     void Load();
 
-    size_t GetNumTextures() { return m_srv_texture_map.size(); }
+    size_t GetNumTextures() const { return m_srv_texture_map.size(); }
 
     // Below functions could maybe be static, since they are quite general?
-    ID3D12DescriptorHeap* GetSamplerHeap() { return m_sampler_heap.Get(); } 
-    D3D12_GPU_DESCRIPTOR_HANDLE GetSamplerHeapGpuHandle() const { return m_sampler_heap->GetGPUDescriptorHandleForHeapStart(); }
+    static DescriptorHeap* GetSamplerHeap() { return s_sampler_heap.get(); }
+    static D3D12_GPU_DESCRIPTOR_HANDLE GetSamplerHeapGpuHandle() { return s_sampler_heap->GetGpuHandle(); }
 
 private:
     // Create static texture samplers
-    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateSamplers();
+    static std::unique_ptr<DescriptorHeap> CreateSamplers();
 };
 

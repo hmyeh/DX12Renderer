@@ -18,7 +18,10 @@ Application::Application(HINSTANCE hInstance, const wchar_t* instance_name, uint
     m_renderer = std::unique_ptr<Renderer>(new Renderer(m_window->GetWindowHandle(), width, height, use_warp));
 
     m_scene = std::make_unique<Scene>();
-    m_scene->Load();
+    m_scene->LoadResources();
+
+    // Bind scene for descriptor heap
+    m_renderer->Bind(m_scene.get());
 
     m_initialized = true;
 }
@@ -36,7 +39,7 @@ LRESULT CALLBACK Application::WndProc(HWND hwnd, UINT message, WPARAM wParam, LP
     {
     case WM_PAINT:
         update();
-        m_renderer->Render(*m_scene);
+        m_renderer->Render();
         break;
     case WM_SYSKEYDOWN:
     case WM_KEYDOWN:
@@ -73,10 +76,7 @@ LRESULT CALLBACK Application::WndProc(HWND hwnd, UINT message, WPARAM wParam, LP
             uint32_t height = m_window->GetHeight();
 
             m_renderer->Resize(width, height);
-            m_renderer->ResizeDepthBuffer(width, height);
         }
-
-        //resize();
     }
     break;
     case WM_DESTROY:

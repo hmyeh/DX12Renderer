@@ -23,9 +23,11 @@
     <ClCompile Include="src\buffer.cpp" />
     <ClCompile Include="src\commandlist.cpp" />
     <ClCompile Include="src\commandqueue.cpp" />
+    <ClCompile Include="src\descriptorheap.cpp" />
     <ClCompile Include="src\dx12_api.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\mesh.cpp" />
+    <ClCompile Include="src\pipeline.cpp" />
     <ClCompile Include="src\renderer.cpp" />
     <ClCompile Include="src\scene.cpp" />
     <ClCompile Include="src\texture.cpp" />
@@ -38,6 +40,7 @@
     <ClInclude Include="src\camera.h" />
     <ClInclude Include="src\commandlist.h" />
     <ClInclude Include="src\commandqueue.h" />
+    <ClInclude Include="src\descriptorheap.h" />
     <ClInclude Include="src\dx12_api.h" />
     <ClInclude Include="src\mesh.h" />
     <ClInclude Include="src\pipeline.h" />

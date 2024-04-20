@@ -1,5 +1,7 @@
 #include "commandlist.h"
 
+#include <algorithm>
+
 #include "renderer.h"
 #include "utility.h"
 #include "dx12_api.h"
@@ -19,7 +21,8 @@ void CommandList::SetCommandAllocator(Microsoft::WRL::ComPtr<ID3D12CommandAlloca
 	m_upload_buffers.clear();
 }
 
-void CommandList::UploadBufferData(uint64_t upload_size, ID3D12Resource* destination_resource, unsigned int num_subresources, D3D12_SUBRESOURCE_DATA* subresources_data) {
+void CommandList::UploadBufferData(uint64_t upload_size, ID3D12Resource* destination_resource, unsigned int num_subresources, D3D12_SUBRESOURCE_DATA* subresources_data) 
+{
 	// Create upload buffer of appropriate size
 	UploadBuffer upload_buffer;
 	upload_buffer.Create(upload_size);
@@ -27,6 +30,13 @@ void CommandList::UploadBufferData(uint64_t upload_size, ID3D12Resource* destina
 	m_upload_buffers.push_back(upload_buffer);
 
 	UpdateSubresources(m_command_list.Get(), destination_resource, upload_buffer.GetResource(), 0, 0, num_subresources, subresources_data);
+}
+
+void CommandList::SetDescriptorHeaps(std::vector<DescriptorHeap*> heaps)
+{
+	std::vector<ID3D12DescriptorHeap*> d12heaps(heaps.size());
+	std::transform(heaps.begin(), heaps.end(), d12heaps.begin(), [](DescriptorHeap* heap) { return heap->GetDescriptorHeap(); });
+	m_command_list->SetDescriptorHeaps(CastToUint(d12heaps.size()), &d12heaps[0]);
 }
 
 void CommandList::ResourceBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES state_before, D3D12_RESOURCE_STATES state_after)

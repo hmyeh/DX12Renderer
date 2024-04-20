@@ -23,7 +23,7 @@ inline void ThrowIfFailed(HRESULT hr)
 
 std::wstring to_wstring(std::string str);
 
-inline unsigned int CastSize_tToUint(size_t size) {
+inline unsigned int CastToUint(size_t size) {
     if (size > UINT_MAX)
         throw std::exception("Failed to cast size_t to unsigned int due to size_t > UINT_MAX");
     return static_cast<unsigned int>(size);
