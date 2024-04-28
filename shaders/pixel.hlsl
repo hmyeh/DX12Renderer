@@ -10,7 +10,7 @@ struct PixelShaderInput
     float2 TextureCoord : TEXTURE_COORD;
 };
 
-float4 main(PixelShaderInput IN) : SV_Target
+float4 main(PixelShaderInput IN) : SV_TARGET
 {
-    return diffuseMap.Sample(sampleWrap, IN.TextureCoord);
+	return diffuseMap.Sample(sampleWrap, IN.TextureCoord);
 }

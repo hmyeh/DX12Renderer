@@ -8,45 +8,43 @@
 #include <map>
 #include <string>
 
-#include "commandqueue.h"
 #include "buffer.h"
+#include "commandqueue.h"
 #include "descriptorheap.h"
 
-class Texture : public GpuResource {
+
+class Texture : public GpuResource, public IRenderTarget {
 private:
     DirectX::ScratchImage m_image;
     DirectX::TexMetadata m_metadata;
-
-    D3D12_CPU_DESCRIPTOR_HANDLE m_rtv_handle;
-    D3D12_CPU_DESCRIPTOR_HANDLE m_dsv_handle;
-    D3D12_CPU_DESCRIPTOR_HANDLE m_srv_handle;
+    D3D12_RESOURCE_FLAGS m_flags;
 
 public:
-    Texture() : m_metadata{}, m_rtv_handle{}, m_dsv_handle{}, m_srv_handle{} {}
-
-    void SetRtvHandle(const D3D12_CPU_DESCRIPTOR_HANDLE& rtv_handle) { m_rtv_handle = rtv_handle; }
-    void SetDsvHandle(const D3D12_CPU_DESCRIPTOR_HANDLE& dsv_handle) { m_dsv_handle = dsv_handle; }
-    void SetSrvHandle(const D3D12_CPU_DESCRIPTOR_HANDLE& srv_handle) { m_srv_handle = srv_handle; }
+    Texture() : m_metadata{}, m_flags(D3D12_RESOURCE_FLAG_NONE) {}
 
     // create the resource
     // depth = arraysize
     void Create(DirectX::TEX_DIMENSION dimensions, DXGI_FORMAT format, uint32_t width, uint32_t height, uint32_t depth, uint32_t mip_levels, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
 
-    void CreateViews();
-
     void Upload(CommandList& command_list);
 
-    void Bind(const D3D12_CPU_DESCRIPTOR_HANDLE& cpu_desc_handle);
     void Read(const std::wstring& file_name);
+
+    // IRenderTarget implementations
+    virtual void Clear(CommandList& command_list) override;
+    virtual D3D12_CPU_DESCRIPTOR_HANDLE GetHandle() const override;
+
+    // Needs method to use as SRV after being used as rendertarget
+    void UseShaderResource(CommandList& command_list) { TransitionResourceState(command_list, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE); }// TODO: figure out D3D12_RESOURCE_STATE_DEPTH_READ is needed for depth stencil view reading in shader
 };
 
 
 class TextureLibrary {
 public:
     // for allocating the texture descriptors of different types (non-shader visible)
-    std::unique_ptr<DescriptorHeap> m_srv_heap;
-    std::unique_ptr<DescriptorHeap> m_rtv_heap;
-    std::unique_ptr<DescriptorHeap> m_dsv_heap;
+    DescriptorHeap m_srv_heap;
+    DescriptorHeap m_rtv_heap;
+    DescriptorHeap m_dsv_heap;
 
     // for now static since using the same samplers
     static std::unique_ptr<DescriptorHeap> s_sampler_heap;
@@ -67,6 +65,9 @@ public:
     // Lazily allocate the descriptors
     void AllocateDescriptors();
 
+    void Bind(FrameDescriptorHeap* descriptor_heap);
+    void Bind(FrameDescriptorHeap* descriptor_heap, unsigned int frame_idx);
+
     Texture* CreateTexture(std::wstring file_name);
     Texture* CreateRenderTargetTexture(DXGI_FORMAT format, uint32_t width, uint32_t height);
     Texture* CreateDepthTexture(DXGI_FORMAT format, uint32_t width, uint32_t height);
@@ -74,7 +75,7 @@ public:
     // Loading all textures to GPU at once
     void Load();
 
-    size_t GetNumTextures() const { return m_srv_texture_map.size(); }
+    size_t GetNumTextures() const { return m_srv_texture_map.size() + m_rtv_textures.size() + m_dsv_textures.size(); }
 
     // Below functions could maybe be static, since they are quite general?
     static DescriptorHeap* GetSamplerHeap() { return s_sampler_heap.get(); }

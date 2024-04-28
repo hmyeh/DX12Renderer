@@ -6,8 +6,10 @@
 
 #include <vector>
 
-#include "buffer.h"
-#include "descriptorheap.h"
+// Forward declarations
+class UploadBuffer;
+class IDescriptorHeap;
+class IRenderTarget;
 
 class CommandList {
 private:
@@ -41,13 +43,14 @@ public:
 	void SetGraphicsRootDescriptorTable(unsigned int param_idx, const D3D12_GPU_DESCRIPTOR_HANDLE& descriptor) { m_command_list->SetGraphicsRootDescriptorTable(param_idx, descriptor); }
 
 	// descriptor heap should only be set once
-	void SetDescriptorHeaps(std::vector<DescriptorHeap*> heaps);
+	void SetDescriptorHeaps(std::vector<IDescriptorHeap*> heaps);
 
 	// Render target
 	void SetViewport(const D3D12_VIEWPORT& viewport) { m_command_list->RSSetViewports(1, &viewport); }
 	void SetScissorRect(const D3D12_RECT& scissor_rect) { m_command_list->RSSetScissorRects(1, &scissor_rect); }
 
 	void SetRenderTargets(unsigned int num_rtvs, D3D12_CPU_DESCRIPTOR_HANDLE* render_target_views, D3D12_CPU_DESCRIPTOR_HANDLE* depth_stencil_view) { m_command_list->OMSetRenderTargets(num_rtvs, render_target_views, FALSE, depth_stencil_view); }
+	void SetRenderTargets(const std::vector<IRenderTarget*>& render_target_views, IRenderTarget* depth_stencil_view);
 	void ClearRenderTargetView(const D3D12_CPU_DESCRIPTOR_HANDLE& rtv, const float clear_color[4]) { m_command_list->ClearRenderTargetView(rtv, clear_color, 0, nullptr); }
 	void ClearDepthStencilView(const D3D12_CPU_DESCRIPTOR_HANDLE& dsv, float depth) { m_command_list->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, depth, 0, 0, nullptr); }
 

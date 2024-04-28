@@ -1,8 +1,8 @@
 #include "renderer.h"
 
 #include "scene.h"
-#include <iostream>
-
+#include "utility.h"
+#include "dx12_api.h"
 
 /// Renderer
 
@@ -13,29 +13,34 @@ Renderer::Renderer(HWND hWnd, uint32_t width, uint32_t height, bool use_warp) :
     m_scissor_rect(CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX)),
     m_viewport(CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height))),
     m_camera(width, height),
-    m_command_queue(D3D12_COMMAND_LIST_TYPE_DIRECT)
+    m_command_queue(D3D12_COMMAND_LIST_TYPE_DIRECT),
+    m_rtv_descriptor_heap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, s_num_frames),
+    m_dsv_descriptor_heap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1u),
+    m_cbv_srv_descriptor_heap(s_num_frames)
 {
     m_tearing_supported = directx::CheckTearingSupport();
 
     Microsoft::WRL::ComPtr<ID3D12Device2> device = GetDevice();
 
     m_swap_chain = directx::CreateSwapChain(hWnd, m_command_queue.GetD12CommandQueue(), width, height, s_num_frames);
-
     m_current_backbuffer_idx = m_swap_chain->GetCurrentBackBufferIndex();
 
     // Create the backbuffers (renderbuffers)
-    m_rtv_descriptor_heap = std::unique_ptr<DescriptorHeap>(new DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, s_num_frames));
     CreateBackbuffers();
 
     // Create the descriptor heap for the depth-stencil view.
-    m_dsv_descriptor_heap = std::unique_ptr<DescriptorHeap>(new DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1));
-    m_depth_buffer.Create(width, height, m_dsv_descriptor_heap->GetCpuHandle());
+    m_depth_buffer.Create(width, height);
+    m_dsv_descriptor_heap.Bind(&m_depth_buffer);
+
+    // Create render texture
+    m_render_texture = m_texture_library.CreateRenderTargetTexture(DXGI_FORMAT_R8G8B8A8_UNORM, width, height);
 
     // create pipeline
-    m_pipeline.Init();
-    m_pipeline.SetViewport(&m_viewport);
-    m_pipeline.SetScissorRect(&m_scissor_rect);
+    m_pipeline.Init(&m_cbv_srv_descriptor_heap, &m_viewport, &m_scissor_rect);
     m_pipeline.SetCamera(&m_camera);
+
+    // create image pipeline
+    m_img_pipeline.Init(&m_command_queue, &m_cbv_srv_descriptor_heap, &m_viewport, &m_scissor_rect);
 }
 
 Renderer::~Renderer() {
@@ -68,16 +73,25 @@ void Renderer::CreateBackbuffers()
 {
     for (int i = 0; i < s_num_frames; ++i)
     {
-        m_backbuffers[i].Create(m_swap_chain, i, m_rtv_descriptor_heap->GetCpuHandle(i));
+        m_backbuffers[i].Create(m_swap_chain, i);
+        m_rtv_descriptor_heap.Bind(&m_backbuffers[i]);
     }
 }
 
 void Renderer::Bind(Scene* scene) 
 {
     m_scene = scene;
+    // Allocate local texture library descriptors
+    m_texture_library.AllocateDescriptors();
+
     // Create the shader visible CBV/SRV/UAV descriptor heap
-    m_cbv_srv_descriptor_heap = std::unique_ptr<DescriptorHeap>(new DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, m_scene->GetNumFrameDescriptors() * s_num_frames, true)); // TODO: add number of descriptors for pipelines
-    m_scene->Bind(m_cbv_srv_descriptor_heap.get());
+    m_cbv_srv_descriptor_heap.Allocate(m_scene->GetNumFrameDescriptors() + m_texture_library.GetNumTextures());
+    m_scene->Bind(&m_cbv_srv_descriptor_heap);
+
+    // Bind image pipeline shader textures
+    m_texture_library.Bind(&m_cbv_srv_descriptor_heap);
+    // Not sure where to place this, since this only makes sense after the texture is bound
+    m_img_pipeline.SetInputTexture(m_render_texture);
 
     // set pipeline scene
     m_pipeline.SetScene(m_scene);
@@ -93,23 +107,28 @@ void Renderer::Render()
     CommandList command_list = m_command_queue.GetCommandList();
 
     // Set descriptor heaps once here
-    command_list.SetDescriptorHeaps({m_cbv_srv_descriptor_heap.get(), TextureLibrary::GetSamplerHeap()});
-
-    // Set render target
-    m_pipeline.SetRenderTargets({ &backbuffer }, &m_depth_buffer);
-
-    // Clear the render target.
-    m_pipeline.Clear(command_list);
+    command_list.SetDescriptorHeaps({&m_cbv_srv_descriptor_heap, TextureLibrary::GetSamplerHeap()});
 
     // Update the scene cbv
     m_scene->Update(m_current_backbuffer_idx, m_camera);
 
+    // Set render target
+    m_pipeline.SetRenderTargets({ m_render_texture }, &m_depth_buffer);
+
+    // Clear the render target.
+    m_pipeline.Clear(command_list);
+
     // Run Pipeline render
     m_pipeline.Render(m_current_backbuffer_idx, command_list);
 
+    // Run image pipeline
+    m_img_pipeline.SetRenderTargets({ &backbuffer }, nullptr);
+    m_img_pipeline.Clear(command_list);
+    m_img_pipeline.Render(m_current_backbuffer_idx, command_list);
+
     // Present
     {
-        backbuffer.TransitionResourceState(command_list, D3D12_RESOURCE_STATE_PRESENT);
+        backbuffer.Present(command_list);
 
         uint64_t fence_value = m_command_queue.ExecuteCommandList(command_list);
         backbuffer.SetFenceValue(fence_value);

@@ -2,8 +2,8 @@
 
 #include <d3d12.h>
 #include <wrl.h>
-#include <DirectXMath.h>
 #include <dxgi1_6.h>
+#include <DirectXMath.h>
 
 #include <vector>
 
@@ -19,8 +19,14 @@ protected:
     // Naive way of tracking resource state
     D3D12_RESOURCE_STATES m_resource_state;
 
+    // Descriptor handles
+    D3D12_CPU_DESCRIPTOR_HANDLE m_rtv_handle;
+    D3D12_CPU_DESCRIPTOR_HANDLE m_dsv_handle;
+    D3D12_CPU_DESCRIPTOR_HANDLE m_cbv_handle;
+    D3D12_CPU_DESCRIPTOR_HANDLE m_srv_handle;
+
 public:
-    GpuResource() : m_resource_state(D3D12_RESOURCE_STATE_COMMON) {}
+    GpuResource() : m_resource_state(D3D12_RESOURCE_STATE_COMMON), m_rtv_handle{}, m_dsv_handle{}, m_cbv_handle{}, m_srv_handle{} {}
 
     virtual ~GpuResource() { Destroy(); }
 
@@ -29,9 +35,20 @@ public:
 
     ID3D12Resource* GetResource() { return m_resource.Get(); }
 
-    // naive way to do this
+    // TODO: look at how to make this work for multithreaded situation
     void TransitionResourceState(CommandList& command_list, D3D12_RESOURCE_STATES updated_state);
     D3D12_RESOURCE_STATES GetResourceState() const { return m_resource_state; }
+
+    // Descriptor functions
+    D3D12_CPU_DESCRIPTOR_HANDLE GetRTVHandle() const { return m_rtv_handle; }
+    D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle() const { return m_dsv_handle; }
+    D3D12_CPU_DESCRIPTOR_HANDLE GetCBVHandle() const { return m_cbv_handle; }
+    D3D12_CPU_DESCRIPTOR_HANDLE GetSRVHandle() const { return m_srv_handle; }
+
+    void BindRenderTargetView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_RENDER_TARGET_VIEW_DESC* desc = nullptr);
+    void BindDepthStencilView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_DEPTH_STENCIL_VIEW_DESC* desc = nullptr);
+    void BindConstantBufferView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle);
+    void BindShaderResourceView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_SHADER_RESOURCE_VIEW_DESC* desc = nullptr);
 };
 
 
@@ -43,6 +60,7 @@ public:
     }
 
     void Create(size_t buffer_size);
+    void Map(unsigned int subresource, const D3D12_RANGE* read_range, void** buffer_WO);
 };
 
 
@@ -84,16 +102,22 @@ public:
 
 };
 
-class RenderBuffer : public GpuResource {
-private:
-    uint64_t m_fence_value; // should i keep the fence value in here or not?...
+// Interface for rendertargets
+class IRenderTarget {
+public:
+    virtual D3D12_CPU_DESCRIPTOR_HANDLE GetHandle() const = 0;// GetRTVHandle / dsv handle all cpu handles
+    virtual void Clear(CommandList& command_list) = 0;
+    // also need a function to transition resource to SRV state if used as shader variable
+};
 
-    D3D12_CPU_DESCRIPTOR_HANDLE m_desc_handle;
+class RenderBuffer : public GpuResource, public IRenderTarget {
+private:
+    uint64_t m_fence_value; 
 
 public:
     RenderBuffer() : m_fence_value(0) {}
 
-    void Create(const Microsoft::WRL::ComPtr<IDXGISwapChain4>& swap_chain, unsigned int frame_idx, const D3D12_CPU_DESCRIPTOR_HANDLE& rtv_handle);
+    void Create(const Microsoft::WRL::ComPtr<IDXGISwapChain4>& swap_chain, unsigned int frame_idx);
 
     uint64_t GetFenceValue() const { return m_fence_value; }
     void SetFenceValue(uint64_t updated_fence_value) {
@@ -102,26 +126,24 @@ public:
         m_fence_value = updated_fence_value;
     }
 
-    D3D12_CPU_DESCRIPTOR_HANDLE GetDescHandle() const { return m_desc_handle; }
+    virtual void Clear(CommandList& command_list) override;
+    virtual D3D12_CPU_DESCRIPTOR_HANDLE GetHandle() const override { return GetRTVHandle(); }
 
-    void Clear(CommandList& command_list);
+    void Present(CommandList& command_list) { TransitionResourceState(command_list, D3D12_RESOURCE_STATE_PRESENT); }
 };
 
-class DepthBuffer : public GpuResource {
-private:
-    D3D12_CPU_DESCRIPTOR_HANDLE m_desc_handle;
-
+class DepthBuffer : public GpuResource, public IRenderTarget {
 public:
-    DepthBuffer() {}
+    DepthBuffer() : GpuResource() {}
 
-    void Create(uint32_t width, uint32_t height, const D3D12_CPU_DESCRIPTOR_HANDLE& dsv_handle);
+    void Create(uint32_t width, uint32_t height);
 
-    void Clear(CommandList& command_list);
+    virtual void Clear(CommandList& command_list) override;
+    virtual D3D12_CPU_DESCRIPTOR_HANDLE GetHandle() const override { return GetDSVHandle(); }
 
     void Resize(uint32_t width, uint32_t height) {
         Destroy();
-        Create(width, height, m_desc_handle);
+        Create(width, height);
+        //Bind(DescriptorType::DepthStencilView, m_dsv_handle);// not sure if needed
     }
-
-    D3D12_CPU_DESCRIPTOR_HANDLE GetDescHandle() const { return m_desc_handle; }
 };
