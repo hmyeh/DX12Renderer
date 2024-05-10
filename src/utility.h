@@ -6,10 +6,12 @@
 #include <DirectXMath.h>
 #include <cstdio>
 
-//#include <locale>
-//#include <codecvt>
+#include <algorithm> 
+#include <cctype>
+#include <locale>
 #include <string>
 #include <stdlib.h>
+#include <vector>
 
 // From DXSampleHelper.h 
 // Source: https://github.com/Microsoft/DirectX-Graphics-Samples
@@ -22,6 +24,22 @@ inline void ThrowIfFailed(HRESULT hr)
 }
 
 std::wstring to_wstring(std::string str);
+
+std::vector<std::string> SplitString(std::string str, const std::string& delimiter);
+
+// trim from start (in place)
+inline void ltrim(std::string& s) {
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
+        return !std::isspace(ch);
+        }));
+}
+
+// trim from end (in place)
+inline void rtrim(std::string& s) {
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
+        return !std::isspace(ch);
+        }).base(), s.end());
+}
 
 inline unsigned int CastToUint(size_t size) {
     if (size > UINT_MAX)

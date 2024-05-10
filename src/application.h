@@ -10,13 +10,14 @@
 #include "window.h"
 #include "renderer.h"
 #include "scene.h"
-#include "texture.h"
+#include "gui.h"
 
 class Application {
 private:
     std::unique_ptr<Window> m_window;
     std::unique_ptr<Renderer> m_renderer;
-    std::unique_ptr<Scene> m_scene;
+    Scene m_scene;
+    GUI m_gui;
 
     // Set to true once the DX12 objects have been initialized.
     bool m_initialized;

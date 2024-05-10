@@ -1,9 +1,12 @@
 #include "scene.h"
 
+#include "tinyxml2/tinyxml2.h"
+
 #include "buffer.h"
 #include "mesh.h"
 #include "camera.h"
 #include "descriptorheap.h"
+#include "utility.h"
 
 Scene::Scene() :
 	m_command_queue(CommandQueue(D3D12_COMMAND_LIST_TYPE_COPY)), m_num_frame_descriptors(1 + 1) // 1 srv diffuse texture (will be changed every model/mesh NO THIS DOES NOT WORK THIS WAY SINCE ALL DRAWS ARE QUEUED UP ON SAME COMMANDLIST...) + 1 cbv * framecount
@@ -16,8 +19,9 @@ Scene::~Scene()
 }
 
 void Scene::LoadResources() {
-    // for now set here
-    m_items.push_back(Item{ Mesh::ReadFile("resource/box.obj", &m_texture_library) });
+    //Item item(Mesh::ReadFile("resource/box.obj", &m_texture_library));
+    //// for now set here
+    //m_items.push_back(item);// Item(Mesh::ReadFile("resource/box.obj", &m_texture_library)));
 
     // Load all textures needs to be done after all descriptors have been allocated
     m_texture_library.Load();
@@ -68,7 +72,8 @@ void Scene::Bind(FrameDescriptorHeap* descriptor_heap) {// Note: could cache the
     }
 }
 
-void Scene::CreateSceneBuffer() {
+void Scene::CreateSceneBuffer() 
+{
     Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
 
     // create a resource heap, descriptor heap, and pointer to cbv for each frame
@@ -83,3 +88,48 @@ void Scene::CreateSceneBuffer() {
     }
 }
 
+
+void Scene::ReadXmlFile(const std::string& xml_file)
+{
+    tinyxml2::XMLDocument doc;
+    doc.LoadFile(xml_file.c_str());
+    tinyxml2::XMLElement* scene = doc.FirstChildElement("scene");
+    
+    if (!scene)
+        throw std::exception("XML does not contain scene element");
+    
+    // Parse the scene items
+    tinyxml2::XMLElement*  item = scene->FirstChildElement("item");
+    while (item) {
+        // Create mesh
+        std::string mesh_str = item->FirstChildElement("mesh")->FirstChild()->Value();
+        Mesh mesh = Mesh::ReadFile(mesh_str, &m_texture_library);
+
+        // Parse position, rotation and scale
+        std::string pos_str = item->FirstChildElement("position")->FirstChild()->Value();
+        std::vector<std::string> pos_split = SplitString(pos_str, ",");
+        if (pos_split.size() != 3)
+            throw std::exception("Incorrect number of positional elements parsed in XML");
+        DirectX::XMFLOAT4 position (std::stof(pos_split[0]), std::stof(pos_split[1]), std::stof(pos_split[2]), 1.0f);
+        
+        std::string rot_str = item->FirstChildElement("rotation")->FirstChild()->Value();
+        std::vector<std::string> rot_split = SplitString(rot_str, ",");
+        if (rot_split.size() != 3)
+            throw std::exception("Incorrect number of rotational elements parsed in XML");
+        DirectX::XMVECTOR rotation = DirectX::XMQuaternionRotationRollPitchYaw(std::stof(rot_split[0]), std::stof(rot_split[1]), std::stof(rot_split[2]));
+
+        std::string scale_str = item->FirstChildElement("scale")->FirstChild()->Value();
+        std::vector<std::string> scale_split = SplitString(scale_str, ",");
+        if (scale_split.size() != 3)
+            throw std::exception("Incorrect number of scaling elements parsed in XML");
+        DirectX::XMFLOAT4 scale(std::stof(scale_split[0]), std::stof(scale_split[1]), std::stof(scale_split[2]), 1.0f);
+
+        // Create scene item
+        Item scene_item(mesh, position, rotation, scale);
+        m_items.push_back(scene_item);
+
+        // Go to next item element
+        item = item->NextSiblingElement();
+    }
+
+}

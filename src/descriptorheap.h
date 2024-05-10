@@ -14,6 +14,7 @@ class RenderBuffer;
 class DepthBuffer;
 class UploadBuffer;
 class GpuResource;
+class ImguiResource;
 
 
 class IDescriptorHeap {
@@ -88,5 +89,8 @@ public:
     
     unsigned int Bind(Texture* texture, unsigned int frame_idx);
     unsigned int Bind(UploadBuffer* constant_buffer, unsigned int frame_idx);// UploadBuffer used as ConstantBuffer
+
+    // For Imgui to reserve srv slots
+    unsigned int Bind(ImguiResource* resource, unsigned int frame_idx);
 
 };

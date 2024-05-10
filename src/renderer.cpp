@@ -3,6 +3,7 @@
 #include "scene.h"
 #include "utility.h"
 #include "dx12_api.h"
+#include "gui.h"
 
 /// Renderer
 
@@ -10,6 +11,8 @@ bool Renderer::use_warp = false;
 Microsoft::WRL::ComPtr<ID3D12Device2> Renderer::DEVICE = nullptr;
 
 Renderer::Renderer(HWND hWnd, uint32_t width, uint32_t height, bool use_warp) :
+    m_hWnd(hWnd),
+    m_render_target_format(DXGI_FORMAT_R8G8B8A8_UNORM),
     m_scissor_rect(CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX)),
     m_viewport(CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height))),
     m_camera(width, height),
@@ -33,7 +36,7 @@ Renderer::Renderer(HWND hWnd, uint32_t width, uint32_t height, bool use_warp) :
     m_dsv_descriptor_heap.Bind(&m_depth_buffer);
 
     // Create render texture
-    m_render_texture = m_texture_library.CreateRenderTargetTexture(DXGI_FORMAT_R8G8B8A8_UNORM, width, height);
+    m_render_texture = m_texture_library.CreateRenderTargetTexture(m_render_target_format, width, height);
 
     // create pipeline
     m_pipeline.Init(&m_cbv_srv_descriptor_heap, &m_viewport, &m_scissor_rect);
@@ -78,15 +81,20 @@ void Renderer::CreateBackbuffers()
     }
 }
 
-void Renderer::Bind(Scene* scene) 
+void Renderer::Bind(Scene* scene, GUI* gui) 
 {
     m_scene = scene;
+    m_gui = gui;
+
     // Allocate local texture library descriptors
     m_texture_library.AllocateDescriptors();
 
     // Create the shader visible CBV/SRV/UAV descriptor heap
-    m_cbv_srv_descriptor_heap.Allocate(m_scene->GetNumFrameDescriptors() + m_texture_library.GetNumTextures());
+    m_cbv_srv_descriptor_heap.Allocate(m_scene->GetNumFrameDescriptors() + m_texture_library.GetNumTextures() + m_gui->GetNumResources());
     m_scene->Bind(&m_cbv_srv_descriptor_heap);
+
+    // Bind imgui resource
+    m_gui->Init(m_hWnd, &m_cbv_srv_descriptor_heap, m_render_target_format);
 
     // Bind image pipeline shader textures
     m_texture_library.Bind(&m_cbv_srv_descriptor_heap);
@@ -112,19 +120,18 @@ void Renderer::Render()
     // Update the scene cbv
     m_scene->Update(m_current_backbuffer_idx, m_camera);
 
-    // Set render target
+    // Run Scene pipeline
     m_pipeline.SetRenderTargets({ m_render_texture }, &m_depth_buffer);
-
-    // Clear the render target.
     m_pipeline.Clear(command_list);
-
-    // Run Pipeline render
     m_pipeline.Render(m_current_backbuffer_idx, command_list);
 
     // Run image pipeline
     m_img_pipeline.SetRenderTargets({ &backbuffer }, nullptr);
     m_img_pipeline.Clear(command_list);
     m_img_pipeline.Render(m_current_backbuffer_idx, command_list);
+
+    // Draw Imgui 
+    m_gui->Render(command_list);
 
     // Present
     {

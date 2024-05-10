@@ -1,6 +1,7 @@
 #include "pipeline.h"
 
 #include <d3dcompiler.h>
+#include <DirectXMath.h>
 
 #include "renderer.h"
 #include "scene.h"
@@ -48,17 +49,17 @@ void ScenePipeline::CreateRootSignature() {
 
     CD3DX12_DESCRIPTOR_RANGE1 ranges[3]; // Perfomance TIP: Order from most frequent to least frequent.
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);    // 2 frequently changed diffuse + normal textures - using registers t1 and t2.
-    ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);    // 1 frequently changed constant buffer.
+    ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);    // 1 frequently changed constant buffer.
     //ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);                                                // 1 infrequently changed shadow texture - starting in register t0.
     ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 2, 0);                                            // 2 static samplers.
 
     // A single 32-bit constant root parameter that is used by the vertex shader.
-    CD3DX12_ROOT_PARAMETER1 rootParameters[3];
-    //rootParameters[0].InitAsConstants(sizeof(DirectX::XMMATRIX) / 4 * 3, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
-    rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
-    rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_ALL);
+    CD3DX12_ROOT_PARAMETER1 rootParameters[4];
+    rootParameters[0].InitAsConstants(sizeof(DirectX::XMMATRIX) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
+    rootParameters[1].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
+    rootParameters[2].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_ALL);
     //rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
-    rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
+    rootParameters[3].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
 
     CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
     rootSignatureDescription.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr, rootSignatureFlags);
@@ -115,15 +116,20 @@ void ScenePipeline::CreatePipelineState() {
 void ScenePipeline::Render(unsigned int frame_idx, CommandList& command_list) {
     IPipeline::Render(frame_idx, command_list);
 
-    command_list.SetGraphicsRootDescriptorTable(1, m_scene->GetSceneConstantsHandle(frame_idx));
-    command_list.SetGraphicsRootDescriptorTable(2, TextureLibrary::GetSamplerHeapGpuHandle());
+    command_list.SetGraphicsRootDescriptorTable(2, m_scene->GetSceneConstantsHandle(frame_idx));
+    command_list.SetGraphicsRootDescriptorTable(3, TextureLibrary::GetSamplerHeapGpuHandle());
 
     for (const auto& scene_item : m_scene->GetSceneItems()) {
         command_list.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         command_list.SetVertexBuffer(scene_item.mesh.GetVertexBufferView());
         command_list.SetIndexBuffer(scene_item.mesh.GetIndexBufferView());
 
-        command_list.SetGraphicsRootDescriptorTable(0, scene_item.resource_handles[frame_idx][0]);// grabbing diffuse tex hardcoded
+        command_list.SetGraphicsRootDescriptorTable(1, scene_item.resource_handles[frame_idx][0]);// grabbing diffuse tex hardcoded
+        // TODO: add to graphics root descriptor mat4 position + rotation + scale
+        DirectX::XMVECTOR object_space_origin = DirectX::XMVectorSet(0, 0, 0, 1);
+        DirectX::XMMATRIX model = DirectX::XMMatrixAffineTransformation(DirectX::XMLoadFloat4(&scene_item.scale), object_space_origin, DirectX::XMLoadFloat4(&scene_item.rotation), DirectX::XMLoadFloat4(&scene_item.position));
+        model = DirectX::XMMatrixTranspose(model);
+        command_list.SetGraphicsRoot32BitConstants(0, sizeof(DirectX::XMMATRIX) / 4, &model, 0);
 
         // Draw
         command_list.DrawIndexedInstanced(CastToUint(scene_item.mesh.GetNumIndices()), 1);

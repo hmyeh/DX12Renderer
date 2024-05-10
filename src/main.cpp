@@ -2,8 +2,8 @@
 #include <Windows.h>
 #include <shellapi.h> // For CommandLineToArgvW
 
-
 #include "application.h"
+#include "utility.h"
 
 // Use WARP adapter
 bool g_UseWarp = false;
@@ -41,6 +41,9 @@ void ParseCommandLineArguments()
 int CALLBACK wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLine, int nCmdShow)
 {
     ParseCommandLineArguments();
+    
+    // Initialize required for DirectXTex library https://github.com/microsoft/DirectXTex/wiki/DirectXTex
+    ThrowIfFailed(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
 
     Application app(hInstance, L"instance name", g_ClientWidth, g_ClientHeight);
     app.Show();

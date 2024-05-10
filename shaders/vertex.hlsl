@@ -1,8 +1,12 @@
 /// Vertex Shader
 
-cbuffer ModelViewProjectionCB : register(b0) 
+cbuffer ObjectModelCB : register(b0)
 {
-    //matrix MVP;
+    matrix ObjectModel;
+}
+
+cbuffer ModelViewProjectionCB : register(b1) 
+{
     matrix Model;
     matrix View;
     matrix Projection;
@@ -24,7 +28,13 @@ VertexShaderOutput main(Vertex IN)
 {
     VertexShaderOutput OUT;
     
-    OUT.Position = mul(float4(IN.Position, 1.0f), mul(mul(Model, View), Projection));
+    //matrix mvp = mul(mul(mul(Projection, View), Model), ObjectModel);
+    //OUT.Position = mul(mvp, float4(IN.Position, 1.0f));
+
+    matrix mvp = mul(ObjectModel, mul(Model, mul(View, Projection)));
+    OUT.Position = mul(float4(IN.Position, 1.0f), mvp);
+
+    //OUT.Position = mul(float4(IN.Position, 1.0f), mul(mul(Model, View), Projection));
     OUT.TextureCoord = IN.TextureCoord;
 
     return OUT;

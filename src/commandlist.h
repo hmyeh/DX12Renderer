@@ -41,6 +41,7 @@ public:
 	void SetGraphicsRootSignature(ID3D12RootSignature* root_signature) { m_command_list->SetGraphicsRootSignature(root_signature); }
 	void SetDescriptorHeaps(unsigned int num_heaps, ID3D12DescriptorHeap** heaps) { m_command_list->SetDescriptorHeaps(num_heaps, heaps); }
 	void SetGraphicsRootDescriptorTable(unsigned int param_idx, const D3D12_GPU_DESCRIPTOR_HANDLE& descriptor) { m_command_list->SetGraphicsRootDescriptorTable(param_idx, descriptor); }
+	void SetGraphicsRoot32BitConstants(unsigned int root_param_idx, unsigned int num_values, const void* data,  unsigned int num_offset_values) { m_command_list->SetGraphicsRoot32BitConstants(root_param_idx, num_values, data, num_offset_values); }
 
 	// descriptor heap should only be set once
 	void SetDescriptorHeaps(std::vector<IDescriptorHeap*> heaps);

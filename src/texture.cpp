@@ -10,8 +10,6 @@
 
 void Texture::Create(DirectX::TEX_DIMENSION dimensions, DXGI_FORMAT format, uint32_t width, uint32_t height, uint32_t depth, uint32_t mip_levels, D3D12_RESOURCE_FLAGS flags) 
 {
-    //Destroy();
-
     CD3DX12_RESOURCE_DESC heap_resource_desc;
     switch (dimensions) {
     case DirectX::TEX_DIMENSION_TEXTURE2D:
@@ -86,7 +84,7 @@ void Texture::Read(const std::wstring& file_name)
     else if (file_path.extension() == ".tga")
         ThrowIfFailed(DirectX::LoadFromTGAFile(file_name.c_str(), &m_metadata, m_image));
     else
-        ThrowIfFailed(DirectX::LoadFromWICFile(file_name.c_str(), DirectX::WIC_FLAGS_NONE, &m_metadata, m_image));
+        ThrowIfFailed(DirectX::LoadFromWICFile(file_name.c_str(), DirectX::WIC_FLAGS_FORCE_RGB, &m_metadata, m_image));
 
     Create(m_metadata.dimension, m_metadata.format, m_metadata.width, m_metadata.height, m_metadata.depth, m_metadata.mipLevels);
 

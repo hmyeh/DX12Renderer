@@ -25,12 +25,20 @@
     <ClCompile Include="src\commandqueue.cpp" />
     <ClCompile Include="src\descriptorheap.cpp" />
     <ClCompile Include="src\dx12_api.cpp" />
+    <ClCompile Include="src\gui.cpp" />
+    <ClCompile Include="src\imgui\imgui.cpp" />
+    <ClCompile Include="src\imgui\imgui_draw.cpp" />
+    <ClCompile Include="src\imgui\imgui_impl_dx12.cpp" />
+    <ClCompile Include="src\imgui\imgui_impl_win32.cpp" />
+    <ClCompile Include="src\imgui\imgui_tables.cpp" />
+    <ClCompile Include="src\imgui\imgui_widgets.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\mesh.cpp" />
     <ClCompile Include="src\pipeline.cpp" />
     <ClCompile Include="src\renderer.cpp" />
     <ClCompile Include="src\scene.cpp" />
     <ClCompile Include="src\texture.cpp" />
+    <ClCompile Include="src\tinyxml2\tinyxml2.cpp" />
     <ClCompile Include="src\utility.cpp" />
     <ClCompile Include="src\window.cpp" />
   </ItemGroup>
@@ -42,11 +50,21 @@
     <ClInclude Include="src\commandqueue.h" />
     <ClInclude Include="src\descriptorheap.h" />
     <ClInclude Include="src\dx12_api.h" />
+    <ClInclude Include="src\gui.h" />
+    <ClInclude Include="src\imgui\imconfig.h" />
+    <ClInclude Include="src\imgui\imgui.h" />
+    <ClInclude Include="src\imgui\imgui_impl_dx12.h" />
+    <ClInclude Include="src\imgui\imgui_impl_win32.h" />
+    <ClInclude Include="src\imgui\imgui_internal.h" />
+    <ClInclude Include="src\imgui\imstb_rectpack.h" />
+    <ClInclude Include="src\imgui\imstb_textedit.h" />
+    <ClInclude Include="src\imgui\imstb_truetype.h" />
     <ClInclude Include="src\mesh.h" />
     <ClInclude Include="src\pipeline.h" />
     <ClInclude Include="src\renderer.h" />
     <ClInclude Include="src\scene.h" />
     <ClInclude Include="src\texture.h" />
+    <ClInclude Include="src\tinyxml2\tinyxml2.h" />
     <ClInclude Include="src\utility.h" />
     <ClInclude Include="src\window.h" />
   </ItemGroup>
@@ -67,6 +85,13 @@
     <FxCompile Include="shaders\vertex.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
     </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\imgui\imgui.gdb" />
+    <None Include="src\imgui\imgui.natstepfilter" />
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="src\imgui\imgui.natvis" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

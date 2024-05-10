@@ -4,7 +4,7 @@
 #include "utility.h"
 #include "texture.h"
 #include "buffer.h"
-
+#include "gui.h"
 
 // IDescriptorHeap
 
@@ -157,7 +157,6 @@ unsigned int FrameDescriptorHeap::Bind(Texture* texture, unsigned int frame_idx)
     // Cache in map that texture is bound at bind_idx
     m_resource_descriptor_maps[frame_idx].insert({ dynamic_cast<GpuResource*>(texture), bind_idx });
 
-    //++m_num_bound_descriptors_per_frame[frame_idx];
     return bind_idx;
 }
 
@@ -170,36 +169,21 @@ unsigned int FrameDescriptorHeap::Bind(UploadBuffer* constant_buffer, unsigned i
     D3D12_CPU_DESCRIPTOR_HANDLE handle = GetCpuHandle(bind_idx);
     constant_buffer->BindConstantBufferView(handle);
 
-    // Cache in map that texture is bound at bind_idx
+    // Cache in map that constant_buffer is bound at bind_idx
     m_resource_descriptor_maps[frame_idx].insert({ dynamic_cast<GpuResource*>(constant_buffer), bind_idx });
 
-    //++m_num_bound_descriptors_per_frame[frame_idx];
     return bind_idx;
 }
 
-//unsigned int FrameDescriptorHeap::Bind(RenderBuffer* render_buffer, unsigned int frame_idx) {
-//    f(m_num_bound_descriptors_per_frame[frame_idx] == m_num_frame_descriptors)
-//        throw std::exception("Already reached max amount of descriptors in heap");
-//
-//    unsigned int bind_idx = m_num_bound_descriptors_per_frame[frame_idx] + frame_idx * m_num_frame_descriptors;
-//    D3D12_CPU_DESCRIPTOR_HANDLE handle = GetCpuHandle(bind_idx);
-//    render_buffer->BindShaderResourceView(handle);
-//
-//    // Cache in map that texture is bound at bind_idx
-//    m_resource_descriptor_map.insert({ dynamic_cast<GpuResource*>(render_buffer), bind_idx });
-//
-//    ++m_num_bound_descriptors_per_frame[frame_idx];
-//    return bind_idx;
-//}
-//
-//unsigned int FrameDescriptorHeap::Bind(DepthBuffer* depth_buffer) {
-//    if (m_num_bound_descriptors == m_num_frame_descriptors)
-//        throw std::exception("Already reached max amount of descriptors in heap");
-//
-//    unsigned int start_idx = m_num_bound_descriptors;
-//    for (unsigned int i = 0; i < m_num_frames; ++i)
-//        depth_buffer->Bind(GetCpuHandle(i, m_num_bound_descriptors));
-//
-//    ++m_num_bound_descriptors;
-//    return start_idx;
-//}
+unsigned int FrameDescriptorHeap::Bind(ImguiResource* resource, unsigned int frame_idx)
+{
+    if (m_resource_descriptor_maps[frame_idx].size() == m_num_frame_descriptors)
+        throw std::exception("Already reached max amount of descriptors in heap");
+
+    unsigned int bind_idx = CastToUint(m_resource_descriptor_maps[frame_idx].size()) + frame_idx * m_num_frame_descriptors;
+
+    // Cache in map that resource is bound at bind_idx
+    m_resource_descriptor_maps[frame_idx].insert({ dynamic_cast<GpuResource*>(resource), bind_idx });
+
+    return bind_idx;
+}

@@ -17,11 +17,12 @@ Application::Application(HINSTANCE hInstance, const wchar_t* instance_name, uint
 
     m_renderer = std::unique_ptr<Renderer>(new Renderer(m_window->GetWindowHandle(), width, height, use_warp));
 
-    m_scene = std::make_unique<Scene>();
-    m_scene->LoadResources();
+    //m_scene = std::make_unique<Scene>();
+    m_scene.ReadXmlFile("resource/scene.xml");
+    m_scene.LoadResources();
 
     // Bind scene for descriptor heap
-    m_renderer->Bind(m_scene.get());
+    m_renderer->Bind(&m_scene, &m_gui);
 
     m_initialized = true;
 }
@@ -34,6 +35,9 @@ LRESULT CALLBACK Application::WndProc(HWND hwnd, UINT message, WPARAM wParam, LP
 {
     if (!m_initialized) 
         return ::DefWindowProcW(hwnd, message, wParam, lParam);
+
+    // Imgui
+    m_gui.WndProc(hwnd, message, wParam, lParam);
 
     switch (message)
     {
@@ -111,4 +115,5 @@ void Application::update()
         frameCounter = 0;
         elapsedSeconds = 0.0;
     }
+
 }

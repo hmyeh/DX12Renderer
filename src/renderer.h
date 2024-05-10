@@ -16,6 +16,7 @@
 
 // Forward declaration
 class Scene;
+class GUI;
 
 class Renderer {
 public:
@@ -62,6 +63,11 @@ private:
     Camera m_camera;
     TextureLibrary m_texture_library;
 
+    HWND m_hWnd;
+    DXGI_FORMAT m_render_target_format;
+
+    GUI* m_gui;
+
 public:
     Renderer(HWND hWnd, uint32_t width, uint32_t height, bool use_warp = false);
     ~Renderer();
@@ -70,7 +76,7 @@ public:
     static Microsoft::WRL::ComPtr<ID3D12Device2> GetDevice();
 
     // bind once for the shader visible descriptorheap 
-    void Bind(Scene* scene);
+    void Bind(Scene* scene, GUI* gui);
 
     void Render();
 

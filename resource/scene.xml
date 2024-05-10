@@ -1,0 +1,8 @@
+<scene>
+	<item>
+		<mesh>resource/xyzrgb_dragon.obj</mesh>
+		<position>0.0, 0.0 ,0.0</position>
+		<rotation>0.0, 0.0, 0.0</rotation>
+		<scale>0.01, 0.01, 0.01</scale>
+	</item>
+</scene>

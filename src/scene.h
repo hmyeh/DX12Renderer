@@ -1,6 +1,9 @@
 #pragma once
 
+#include <DirectXMath.h>
+
 #include <vector>
+#include <array>
 
 #include "commandqueue.h"
 #include "texture.h"
@@ -17,11 +20,20 @@ class Scene {
 public:
     struct Item {
         Mesh mesh;
-        std::vector<D3D12_GPU_DESCRIPTOR_HANDLE> resource_handles[Renderer::s_num_frames];
+        DirectX::XMFLOAT4 position;
+        DirectX::XMFLOAT4 rotation; // quaternion
+        DirectX::XMFLOAT4 scale;
+        std::array<std::vector<D3D12_GPU_DESCRIPTOR_HANDLE>, Renderer::s_num_frames> resource_handles;// [Renderer::s_num_frames] ;
+
+        Item(const Mesh& mesh, const DirectX::XMFLOAT4& position = DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f), const DirectX::XMVECTOR& rotation = DirectX::XMQuaternionIdentity(), const DirectX::XMFLOAT4& scale = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f)) :
+            mesh(mesh), position(position), scale(scale) 
+        {
+            DirectX::XMStoreFloat4(&this->rotation, rotation);
+        }
     };
 
 private:
-    struct SceneConstantBuffer {
+    struct SceneConstantBuffer { // TODO: aligning for XMMATRIX instead of XMFLOAT4x4? https://learn.microsoft.com/en-us/cpp/cpp/align-cpp?view=msvc-170&redirectedfrom=MSDN
         DirectX::XMMATRIX model; // global scene world model
         DirectX::XMMATRIX view;
         DirectX::XMMATRIX projection;
@@ -67,6 +79,8 @@ public:
 
     // get number of descriptors per frame
     unsigned int GetNumFrameDescriptors() const { return m_num_frame_descriptors; }
+
+    void ReadXmlFile(const std::string& xml_file);
 
 private:
     void CreateSceneBuffer();
