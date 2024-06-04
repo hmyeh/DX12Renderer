@@ -36,17 +36,19 @@ public:
 
 	CommandQueue(D3D12_COMMAND_LIST_TYPE type);
 
-	virtual ~CommandQueue() {}
+	//virtual ~CommandQueue() {}
 
 	CommandList GetCommandList();
 
 	uint64_t ExecuteCommandList(CommandList& command_list);
 	
 	uint64_t Signal();
-	bool IsFenceComplete(uint64_t fence_value) { return m_fence->GetCompletedValue() >= fence_value; }
+	void Signal(uint64_t fence_value);
+	bool IsFenceComplete(uint64_t fence_value) const { return m_fence->GetCompletedValue() >= fence_value; }
 
 	void WaitForFenceValue(uint64_t fence_value);
 
+	uint64_t GetFenceValue() const { return m_fence_value; }
 
 	void Flush();
 

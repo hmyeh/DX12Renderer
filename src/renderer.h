@@ -34,10 +34,10 @@ private:
     unsigned int m_current_backbuffer_idx;
     std::array<RenderBuffer, s_num_frames> m_backbuffers;
 
-    // Render texture
-    Texture* m_render_texture; // initial texture to render to
+    // Render textures
+    std::array<RenderTargetTexture*, s_num_frames> m_render_textures;
 
-    // Depth buffer.
+    // Depth buffer
     DepthBuffer m_depth_buffer;
     // Descriptor heap for depth buffer.
     DescriptorHeap m_dsv_descriptor_heap;
@@ -48,12 +48,10 @@ private:
     // direct queue
     CommandQueue m_command_queue;
 
-    ScenePipeline m_pipeline;
+    DepthMapPipeline m_depthmap_pipeline;
+    ScenePipeline m_scene_pipeline;
     ImagePipeline m_img_pipeline;
 
-    D3D12_VIEWPORT m_viewport;
-    D3D12_RECT m_scissor_rect;
-    
     // By default, enable V-Sync.
     // Can be toggled with the V key.
     bool m_vsync = true;
@@ -65,27 +63,27 @@ private:
 
     HWND m_hWnd;
     DXGI_FORMAT m_render_target_format;
+    DXGI_FORMAT m_depth_stencil_format;
 
     GUI* m_gui;
 
+    uint32_t m_width, m_height;
+
 public:
-    Renderer(HWND hWnd, uint32_t width, uint32_t height, bool use_warp = false);
+    Renderer(HWND hWnd, uint32_t width, uint32_t height, Scene* scene, GUI* gui, bool use_warp = false);
     ~Renderer();
 
     // Singleton device
     static Microsoft::WRL::ComPtr<ID3D12Device2> GetDevice();
 
     // bind once for the shader visible descriptorheap 
-    void Bind(Scene* scene, GUI* gui);
+    void Bind(Scene* scene); // be able to bind to new scene
 
     void Render();
+    void LoadSizeDependentResources(unsigned int width, unsigned int height);
 
     void Resize(uint32_t width, uint32_t height);
-
     void ToggleVsync() { m_vsync = !m_vsync; }
-
-private:
-    void CreateBackbuffers();
 };
 
 

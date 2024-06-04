@@ -7,6 +7,7 @@
 #include "dx12_api.h"
 #include "buffer.h"
 #include "descriptorheap.h"
+#include "rendertarget.h"
 
 
 CommandList::CommandList(Microsoft::WRL::ComPtr<ID3D12CommandAllocator> command_allocator, D3D12_COMMAND_LIST_TYPE command_list_type) :
@@ -42,16 +43,16 @@ void CommandList::SetDescriptorHeaps(std::vector<IDescriptorHeap*> heaps)
 	m_command_list->SetDescriptorHeaps(CastToUint(d12heaps.size()), &d12heaps[0]);
 }
 
-void CommandList::SetRenderTargets(const std::vector<IRenderTarget*>& render_target_views, IRenderTarget* depth_stencil_view)
+void CommandList::SetRenderTargets(const std::vector<IRenderTarget*>& render_target_views, IDepthStencilTarget* depth_stencil_view)
 {
 	D3D12_CPU_DESCRIPTOR_HANDLE rtv_handle{};
 	D3D12_CPU_DESCRIPTOR_HANDLE dsv_handle{};
 	if (!render_target_views.empty() && render_target_views[0]) {
-		rtv_handle = render_target_views[0]->GetHandle();
+		rtv_handle = render_target_views[0]->GetRenderTargetHandle();
 	}
 
 	if (depth_stencil_view)
-		dsv_handle = depth_stencil_view->GetHandle();
+		dsv_handle = depth_stencil_view->GetDepthStencilHandle();
 
 	m_command_list->OMSetRenderTargets(CastToUint(render_target_views.size()), rtv_handle.ptr ? &rtv_handle : nullptr, FALSE, dsv_handle.ptr ? &dsv_handle : nullptr);
 }

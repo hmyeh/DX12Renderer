@@ -19,48 +19,68 @@ protected:
     // Naive way of tracking resource state
     D3D12_RESOURCE_STATES m_resource_state;
 
-    // Descriptor handles
-    D3D12_CPU_DESCRIPTOR_HANDLE m_rtv_handle;
-    D3D12_CPU_DESCRIPTOR_HANDLE m_dsv_handle;
-    D3D12_CPU_DESCRIPTOR_HANDLE m_cbv_handle;
-    D3D12_CPU_DESCRIPTOR_HANDLE m_srv_handle;
-
 public:
-    GpuResource() : m_resource_state(D3D12_RESOURCE_STATE_COMMON), m_rtv_handle{}, m_dsv_handle{}, m_cbv_handle{}, m_srv_handle{} {}
-
+    GpuResource() : m_resource_state(D3D12_RESOURCE_STATE_COMMON) {}
     virtual ~GpuResource() { Destroy(); }
 
-
-    void Destroy() { m_resource.Reset(); }//m_resource = nullptr; }
+    virtual void Destroy() { m_resource.Reset(); }
 
     ID3D12Resource* GetResource() { return m_resource.Get(); }
 
     // TODO: look at how to make this work for multithreaded situation
     void TransitionResourceState(CommandList& command_list, D3D12_RESOURCE_STATES updated_state);
     D3D12_RESOURCE_STATES GetResourceState() const { return m_resource_state; }
+};
 
-    // Descriptor functions
-    D3D12_CPU_DESCRIPTOR_HANDLE GetRTVHandle() const { return m_rtv_handle; }
-    D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle() const { return m_dsv_handle; }
-    D3D12_CPU_DESCRIPTOR_HANDLE GetCBVHandle() const { return m_cbv_handle; }
-    D3D12_CPU_DESCRIPTOR_HANDLE GetSRVHandle() const { return m_srv_handle; }
+class IResourceType {
+    // dummy class
+};
 
-    void BindRenderTargetView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_RENDER_TARGET_VIEW_DESC* desc = nullptr);
-    void BindDepthStencilView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_DEPTH_STENCIL_VIEW_DESC* desc = nullptr);
-    void BindConstantBufferView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle);
-    void BindShaderResourceView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_SHADER_RESOURCE_VIEW_DESC* desc = nullptr);
+class IShaderResource : public IResourceType {
+private:
+    // cpu only handle
+    D3D12_CPU_DESCRIPTOR_HANDLE m_srv_handle; // local non-shadervisible heap handle
+    std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> m_shader_visible_cpu_handles;
+    std::vector<D3D12_GPU_DESCRIPTOR_HANDLE> m_shader_visible_gpu_handles;
+
+protected:
+    virtual void CreateShaderResourceView(ID3D12Resource* resource, const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_SHADER_RESOURCE_VIEW_DESC* desc = nullptr);
+
+public:
+    IShaderResource();
+    D3D12_CPU_DESCRIPTOR_HANDLE GetShaderCPUHandle() const { return m_srv_handle; }
+    D3D12_GPU_DESCRIPTOR_HANDLE GetShaderGPUHandle(unsigned int frame_idx) const { return m_shader_visible_gpu_handles[frame_idx]; }
+    void BindShaderResourceView(unsigned int frame_idx, const D3D12_CPU_DESCRIPTOR_HANDLE& cpu_handle, const D3D12_GPU_DESCRIPTOR_HANDLE& gpu_handle);
+    // in case resource has been reset and recreated for resize
+    void ResourceChanged(ID3D12Resource* resource);
 };
 
 
-// Used to upload texture and mesh data to the GPU via Commited resources
-class UploadBuffer : public GpuResource {
+//
+class IConstantBufferResource : public IResourceType {
+private:
+    D3D12_CPU_DESCRIPTOR_HANDLE m_cbv_cpu_handle;
+    D3D12_GPU_DESCRIPTOR_HANDLE m_cbv_gpu_handle;
+
+protected:
+    void CreateConstantBufferView(ID3D12Resource* resource, const D3D12_CPU_DESCRIPTOR_HANDLE& handle, const D3D12_GPU_DESCRIPTOR_HANDLE& gpu_handle);
+
 public:
-    UploadBuffer() {
+    D3D12_CPU_DESCRIPTOR_HANDLE GetBufferCPUHandle() const { return m_cbv_cpu_handle; }
+    D3D12_GPU_DESCRIPTOR_HANDLE GetBufferGPUHandle() const { return m_cbv_gpu_handle; }
+};
+
+// Used to upload texture and mesh data to the GPU via Commited resources
+class UploadBuffer : public GpuResource, public IConstantBufferResource {
+public:
+    UploadBuffer() : GpuResource(), IConstantBufferResource() {
 
     }
 
     void Create(size_t buffer_size);
     void Map(unsigned int subresource, const D3D12_RANGE* read_range, void** buffer_WO);
+
+    void CreateConstantBufferView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, const D3D12_GPU_DESCRIPTOR_HANDLE& gpu_handle) { IConstantBufferResource::CreateConstantBufferView(m_resource.Get(), handle, gpu_handle); }
 };
 
 
@@ -100,50 +120,4 @@ public:
     D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView() const requires IsVertex<T>;
     D3D12_INDEX_BUFFER_VIEW GetIndexBufferView() const requires IsIndex<T>;
 
-};
-
-// Interface for rendertargets
-class IRenderTarget {
-public:
-    virtual D3D12_CPU_DESCRIPTOR_HANDLE GetHandle() const = 0;// GetRTVHandle / dsv handle all cpu handles
-    virtual void Clear(CommandList& command_list) = 0;
-    // also need a function to transition resource to SRV state if used as shader variable
-};
-
-class RenderBuffer : public GpuResource, public IRenderTarget {
-private:
-    uint64_t m_fence_value; 
-
-public:
-    RenderBuffer() : m_fence_value(0) {}
-
-    void Create(const Microsoft::WRL::ComPtr<IDXGISwapChain4>& swap_chain, unsigned int frame_idx);
-
-    uint64_t GetFenceValue() const { return m_fence_value; }
-    void SetFenceValue(uint64_t updated_fence_value) {
-        if (updated_fence_value < m_fence_value)
-            throw std::exception("this should not be happening");
-        m_fence_value = updated_fence_value;
-    }
-
-    virtual void Clear(CommandList& command_list) override;
-    virtual D3D12_CPU_DESCRIPTOR_HANDLE GetHandle() const override { return GetRTVHandle(); }
-
-    void Present(CommandList& command_list) { TransitionResourceState(command_list, D3D12_RESOURCE_STATE_PRESENT); }
-};
-
-class DepthBuffer : public GpuResource, public IRenderTarget {
-public:
-    DepthBuffer() : GpuResource() {}
-
-    void Create(uint32_t width, uint32_t height);
-
-    virtual void Clear(CommandList& command_list) override;
-    virtual D3D12_CPU_DESCRIPTOR_HANDLE GetHandle() const override { return GetDSVHandle(); }
-
-    void Resize(uint32_t width, uint32_t height) {
-        Destroy();
-        Create(width, height);
-        //Bind(DescriptorType::DepthStencilView, m_dsv_handle);// not sure if needed
-    }
 };

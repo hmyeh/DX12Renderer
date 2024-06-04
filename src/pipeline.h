@@ -6,14 +6,16 @@
 #include <vector>
 
 #include "mesh.h"
+#include "rendertarget.h"
 
 
 // Forward declarations
 class Scene;
 class Camera;
-class Texture;
+class RenderTargetTexture;
 class IRenderTarget;
 class FrameDescriptorHeap;
+struct ImageOptions;
 
 class IPipeline {
 public:
@@ -37,42 +39,31 @@ protected:
     // Pipeline state object.
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pipeline_state;
 
-    //std::string vertex_shader;
-    //std::string pixel_shader;
-    ////std::string vertex_shader;
-    //std::vector<D3D12_INPUT_ELEMENT_DESC> m_input_layout;
-    //D3D12_RT_FORMAT_ARRAY rtvFormats; //getter for this to ? or maybe check this when setting rendertarget?
-
-    //D3D12_CPU_DESCRIPTOR_HANDLE* m_render_target_view; // TODO: multi target rendering maybe pass std::vector
-    //D3D12_CPU_DESCRIPTOR_HANDLE* m_depth_stencil_view;
-
     FrameDescriptorHeap* m_descriptor_heap;
 
-    // TODO: ensure only DSV targets can bind to m_dsv_rendertarget and RTV rendertargets to rtv_rendertargets
+    // RenderTargets
     std::vector<IRenderTarget*> m_rtv_rendertargets;
-    IRenderTarget* m_dsv_rendertarget;
-    //std::vector<RenderBuffer*> m_rtv_renderbuffers;
-    //DepthBuffer* m_dsv_depthbuffer;
-    //std::vector<Texture*> m_rtv_textures;
-    //Texture* m_dsv_texture;
+    IDepthStencilTarget* m_dsv_rendertarget;
 
     D3D_ROOT_SIGNATURE_VERSION m_root_sig_feature_version;
 
-    D3D12_VIEWPORT* m_viewport;
-    D3D12_RECT* m_scissor_rect;
+    D3D12_VIEWPORT m_viewport;
+    D3D12_RECT m_scissor_rect;
+
+    // Compiled shader path different for debug and release
+    static const std::wstring s_compiled_shader_path;
 
     virtual void CreateRootSignature() = 0;
-
     virtual void CreatePipelineState() = 0;
 
 public:
     IPipeline();
 
-    void Init(FrameDescriptorHeap* descriptor_heap, D3D12_VIEWPORT* viewport, D3D12_RECT* scissor_rect) {
+    void Init(FrameDescriptorHeap* descriptor_heap, unsigned int width, unsigned int height) {
         // TODO: check if init is called before other funcs get called
         m_descriptor_heap = descriptor_heap;
-        m_viewport = viewport;
-        m_scissor_rect = scissor_rect;
+
+        Resize(width, height);
 
         // cannot do this in constructor, so need a separate init function...
         CreateRootSignature();
@@ -80,25 +71,59 @@ public:
     }
 
     //void SetScene(); // set scene to render ?
-    void SetRenderTargets(const std::vector<IRenderTarget*>& rtv_rendertargets, IRenderTarget* dsv_rendertarget) {
+    void SetRenderTargets(const std::vector<IRenderTarget*>& rtv_rendertargets, IDepthStencilTarget* dsv_rendertarget) {
         m_rtv_rendertargets = rtv_rendertargets;
         m_dsv_rendertarget = dsv_rendertarget;
     }
 
     // HOW TO RESIZE VIEWPORT AND RENDERTARGET???!!!
-    void SetViewport(D3D12_VIEWPORT* viewport) { m_viewport = viewport; }
-    void SetScissorRect(D3D12_RECT* scissor_rect) { m_scissor_rect = scissor_rect; }
+  /*  void SetViewport(D3D12_VIEWPORT* viewport) { m_viewport = viewport; }
+    void SetScissorRect(D3D12_RECT* scissor_rect) { m_scissor_rect = scissor_rect; }*/
+    void Resize(unsigned int width, unsigned int height) {
+        m_viewport.Width = static_cast<float>(width);
+        m_viewport.Height = static_cast<float>(height);
+    }
 
-    void Clear(CommandList& command_list)// not sure if necessary? TODO; check that at creation the clear value is given to rtv/dsv
+    virtual void Clear(CommandList& command_list)// not sure if necessary? TODO; check that at creation the clear value is given to rtv/dsv
     {
-        if (m_rtv_rendertargets[0])
-            m_rtv_rendertargets[0]->Clear(command_list);
+        if (!m_rtv_rendertargets.empty() && m_rtv_rendertargets[0])
+            m_rtv_rendertargets[0]->ClearRenderTarget(command_list);
         
         if (m_dsv_rendertarget)
-            m_dsv_rendertarget->Clear(command_list);
+            m_dsv_rendertarget->ClearDepthStencil(command_list);
     }
 
     virtual void Render(unsigned int frame_idx, CommandList& command_list);
+};
+
+class DepthMapPipeline : public IPipeline {
+private:
+    static const unsigned int SHADOW_MAP_SIZE = 1024;
+    Scene* m_scene;
+    // Light* m_light; // <- needs a method to create lightspace matrix and uses bounding box of the scene
+    // TODO: hide SetRenderTargets for this pipeline
+    // using IPipeline::SetRenderTargets;
+    using IPipeline::Init;
+public:
+    DepthMapPipeline() : m_scene(nullptr), IPipeline() {
+
+    }
+
+    void Init(FrameDescriptorHeap* descriptor_heap, Scene* scene) {
+        IPipeline::Init(descriptor_heap, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+        SetScene(scene);
+    }
+
+    // scene contains the light
+    void SetScene(Scene* scene) {
+        m_scene = scene;
+    }
+    // TODO: scene get bounds
+    virtual void CreateRootSignature() override;
+
+    virtual void CreatePipelineState() override;
+    virtual void Clear(CommandList& command_list) override;// TODO: for adding pointlights clear needs to clear all depthmaps
+    virtual void Render(unsigned int frame_idx, CommandList& command_list) override;
 };
 
 class ScenePipeline : public IPipeline {
@@ -106,10 +131,19 @@ private:
     Scene* m_scene;
 
     Camera* m_camera;
+    using IPipeline::Init;
 
 public:
     ScenePipeline() : m_scene(nullptr), m_camera(nullptr), IPipeline() {
 
+    }
+
+    void Init(FrameDescriptorHeap* descriptor_heap, unsigned int width, unsigned int height, Scene* scene, Camera* camera) {
+        IPipeline::Init(descriptor_heap, width, height);
+        
+        // Set scene and camera
+        SetScene(scene);
+        SetCamera(camera);
     }
 
     void SetScene(Scene* scene) {
@@ -129,11 +163,12 @@ public:
 class ImagePipeline : public IPipeline {
 private:
     ScreenQuad m_quad;
-    //TextureLibrary* m_texture_lib;
-    Texture* m_texture; // rendered texture to process
+    std::vector<RenderTargetTexture*> m_textures;
     std::vector<D3D12_GPU_DESCRIPTOR_HANDLE> m_texture_handles;//[Renderer::s_num_frames];
 
     unsigned int m_num_frame_descriptors = 1;
+
+    ImageOptions* m_img_options;
 
 private:
     // Make base class Init private
@@ -144,15 +179,15 @@ private:
 public:
     ImagePipeline();
 
-    void Init(CommandQueue* command_queue, FrameDescriptorHeap* descriptor_heap, D3D12_VIEWPORT* viewport, D3D12_RECT* scissor_rect) {
+    void Init(CommandQueue* command_queue, FrameDescriptorHeap* descriptor_heap, unsigned int width, unsigned int height, ImageOptions* img_options) {
+        m_img_options = img_options;
         // Maybe load the screen quad at a different location and then give it to the imagepipeline Init.
         m_quad.Load(command_queue);
 
-        IPipeline::Init(descriptor_heap, viewport, scissor_rect);
+        IPipeline::Init(descriptor_heap, width, height);
     }
 
-    // TODO: Maybe add some safety checks SRV view etc
-    void SetInputTexture(Texture* texture);
+    void SetInputTexture(int frame_idx, RenderTargetTexture* texture);
 
     virtual void Render(unsigned int frame_idx, CommandList& command_list) override;
 

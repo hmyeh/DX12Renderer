@@ -93,6 +93,15 @@
     <ClCompile Include="src\tinyxml2\tinyxml2.cpp">
       <Filter>tinyxml2</Filter>
     </ClCompile>
+    <ClCompile Include="src\light.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\rendertarget.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\camera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\application.h">
@@ -167,6 +176,12 @@
     <ClInclude Include="src\tinyxml2\tinyxml2.h">
       <Filter>tinyxml2</Filter>
     </ClInclude>
+    <ClInclude Include="src\light.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\rendertarget.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="shaders\pixel.hlsl">
@@ -181,6 +196,9 @@
     <FxCompile Include="shaders\image\image_ps.hlsl">
       <Filter>Shaders\image</Filter>
     </FxCompile>
+    <FxCompile Include="shaders\depthmap_vs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="src\imgui\imgui.gdb">
@@ -189,6 +207,10 @@
     <None Include="src\imgui\imgui.natstepfilter">
       <Filter>imgui</Filter>
     </None>
+    <None Include="shaders\scenebuffer.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="src\imgui\imgui.natvis">

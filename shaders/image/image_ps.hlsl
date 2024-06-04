@@ -1,5 +1,10 @@
 // Pixel Shader
 
+cbuffer ImageCB : register(b0) {
+	float gamma;
+	float exposure;
+};
+
 Texture2D screenMap : register(t0);
 
 SamplerState sampleWrap : register(s0);
@@ -11,10 +16,8 @@ struct PSInput {
 
 float4 main(PSInput IN) : SV_Target
 {
-	// for now constants here but should be passed along
-	float gamma = 2.2;
 	float inv_gamma = 1.0 / gamma;
-	float exposure = 1.0;
+	//float exposure = 1.0;
 
     float4 color = screenMap.Sample(sampleWrap, IN.TextureCoord);
 	// Simple exposure Tone mapping HDR

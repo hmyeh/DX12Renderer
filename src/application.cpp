@@ -1,6 +1,7 @@
 #include "application.h"
 
 #include <functional>
+#include <DirectXMath.h>
 
 
 Application::Application(HINSTANCE hInstance, const wchar_t* instance_name, uint32_t width, uint32_t height, bool use_warp, bool fullscreen)
@@ -15,14 +16,19 @@ Application::Application(HINSTANCE hInstance, const wchar_t* instance_name, uint
     auto update_fn = std::bind(&Application::WndProc, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
     m_window = std::unique_ptr<Window>(new Window(hInstance, instance_name, width, height, update_fn, fullscreen));
 
-    m_renderer = std::unique_ptr<Renderer>(new Renderer(m_window->GetWindowHandle(), width, height, use_warp));
+    m_gui = std::unique_ptr<GUI>(new GUI(m_window->GetWindowHandle()));
 
-    //m_scene = std::make_unique<Scene>();
-    m_scene.ReadXmlFile("resource/scene.xml");
-    m_scene.LoadResources();
+    m_scene = std::make_unique<Scene>();
+    m_scene->ReadXmlFile("resource/scene.xml");
+    m_scene->LoadResources();
+
+    m_renderer = std::unique_ptr<Renderer>(new Renderer(m_window->GetWindowHandle(), width, height, m_scene.get(), m_gui.get(), use_warp));
+
+    
+
 
     // Bind scene for descriptor heap
-    m_renderer->Bind(&m_scene, &m_gui);
+    //m_renderer->Bind(m_scene.get());
 
     m_initialized = true;
 }
@@ -37,7 +43,7 @@ LRESULT CALLBACK Application::WndProc(HWND hwnd, UINT message, WPARAM wParam, LP
         return ::DefWindowProcW(hwnd, message, wParam, lParam);
 
     // Imgui
-    m_gui.WndProc(hwnd, message, wParam, lParam);
+    m_gui->WndProc(hwnd, message, wParam, lParam);
 
     switch (message)
     {
@@ -116,4 +122,5 @@ void Application::update()
         elapsedSeconds = 0.0;
     }
 
+    //m_scene->GetSceneItems()[0].position = ;
 }

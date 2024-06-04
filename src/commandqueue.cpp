@@ -68,6 +68,11 @@ uint64_t CommandQueue::Signal()
 	return fence_value_for_signal;
 }
 
+void CommandQueue::Signal(uint64_t fence_value)
+{
+	ThrowIfFailed(m_command_queue->Signal(m_fence.Get(), fence_value));
+}
+
 void CommandQueue::WaitForFenceValue(uint64_t fence_value)
 {
 	if (m_fence->GetCompletedValue() < fence_value)

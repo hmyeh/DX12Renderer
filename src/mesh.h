@@ -1,5 +1,6 @@
 #pragma once
 
+#define NOMINMAX
 #include <d3d12.h>
 #include <DirectXMath.h>
 #include <wrl.h>
@@ -10,13 +11,12 @@
 
 #include "buffer.h"
 
-
 // Forward declaration
 class CommandQueue;
 class Texture;
 class TextureLibrary;
 
-// Abstract class? for Mesh
+// Abstract class for Mesh
 template <IsVertex T>
 class IMesh {
 protected:
@@ -44,8 +44,6 @@ public:
     void Load(CommandQueue* command_queue);
 
     size_t GetNumIndices() const { return m_indices.size(); }
-
-    // maybe bind function for the textures?
 };
 
 class ScreenQuad : public IMesh<ScreenVertex> {
@@ -70,20 +68,37 @@ public:
     Skybox() {}
 };
 
+// Store material parameters for shader 
+struct MaterialParams {
+    float metallic;
+    float roughness;
+};
+
 class Mesh : public IMesh<Vertex> {
 private:
     Texture* m_diffuse_tex;
+    MaterialParams m_mat_params;
+
+    // Cache bounds of Mesh
+    DirectX::XMFLOAT4 m_min_bounds; 
+    DirectX::XMFLOAT4 m_max_bounds;
 
 public:
     Mesh(const std::vector<Vertex>& verts, const std::vector<uint32_t>& inds, Texture* diffuse_tex) : 
-        m_diffuse_tex(diffuse_tex), IMesh<Vertex>(verts, inds)
+        m_diffuse_tex(diffuse_tex), m_mat_params{0.0f, 0.25f}, IMesh<Vertex>(verts, inds)
     {
-
+        ComputeBounds();
     }
 
     std::vector<Texture*> GetTextures() { return { m_diffuse_tex }; }
+    const MaterialParams* GetMaterial() const { return &m_mat_params; }
+
+    void GetBounds(DirectX::XMFLOAT4& min_bounds, DirectX::XMFLOAT4& max_bounds) const { min_bounds = m_min_bounds; max_bounds = m_max_bounds; }
 
     // Using https://github.com/tinyobjloader/tinyobjloader
     static Mesh ReadFile(std::string file_name, TextureLibrary* texture_library);
+
+private:
+    void ComputeBounds();
 };
 

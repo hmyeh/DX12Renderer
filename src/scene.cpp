@@ -2,6 +2,8 @@
 
 #include "tinyxml2/tinyxml2.h"
 
+#include <stdlib.h>
+
 #include "buffer.h"
 #include "mesh.h"
 #include "camera.h"
@@ -9,8 +11,9 @@
 #include "utility.h"
 
 Scene::Scene() :
-	m_command_queue(CommandQueue(D3D12_COMMAND_LIST_TYPE_COPY)), m_num_frame_descriptors(1 + 1) // 1 srv diffuse texture (will be changed every model/mesh NO THIS DOES NOT WORK THIS WAY SINCE ALL DRAWS ARE QUEUED UP ON SAME COMMANDLIST...) + 1 cbv * framecount
+	m_command_queue(CommandQueue(D3D12_COMMAND_LIST_TYPE_COPY)), m_directional_light(&m_texture_library)
 {
+    srand(time(NULL));
 }
 
 Scene::~Scene() 
@@ -19,10 +22,6 @@ Scene::~Scene()
 }
 
 void Scene::LoadResources() {
-    //Item item(Mesh::ReadFile("resource/box.obj", &m_texture_library));
-    //// for now set here
-    //m_items.push_back(item);// Item(Mesh::ReadFile("resource/box.obj", &m_texture_library)));
-
     // Load all textures needs to be done after all descriptors have been allocated
     m_texture_library.Load();
 
@@ -31,15 +30,22 @@ void Scene::LoadResources() {
         item.mesh.Load(&m_command_queue);
     }
 
-    //CreateSamplers();
     CreateSceneBuffer();
 }
 
 void Scene::Update(unsigned int frame_idx, const Camera& camera) {
     //update scene constant buffer // needs to be transposed since row major directxmath and col major hlsl
-    m_scene_consts[frame_idx].model = DirectX::XMMatrixTranspose(DirectX::XMMatrixIdentity());
     m_scene_consts[frame_idx].view = DirectX::XMMatrixTranspose(camera.GetViewMatrix());
     m_scene_consts[frame_idx].projection = DirectX::XMMatrixTranspose(camera.GetProjectionMatrix());
+    m_scene_consts[frame_idx].camera_position = camera.GetPosition();
+
+    // TODO: update lights
+    DirectX::XMFLOAT3 min_bounds, max_bounds;
+    ComputeBoundingBox(min_bounds, max_bounds);
+    m_directional_light.Update(min_bounds, max_bounds);
+    m_scene_consts[frame_idx].directional_light = m_directional_light.GetLightData();
+
+    m_items[0].position.x = sin(rand() % 10);
 
     // copy our ConstantBuffer instance to the mapped constant buffer resource
     memcpy(m_scene_consts_buffer_WO[frame_idx], &m_scene_consts[frame_idx], sizeof(SceneConstantBuffer));
@@ -52,24 +58,47 @@ void Scene::Bind(FrameDescriptorHeap* descriptor_heap) {// Note: could cache the
     if (descriptor_heap->GetHeapType() != D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)
         throw std::exception("The descriptor heap is not of the right type");
 
-    //m_descriptor_heap = descriptor_heap; // Maybe unnecessary????!!
     for (int i = 0; i < Renderer::s_num_frames; ++i)
     {
-        // Bind all textures TODO: every frame...
+        // Bind all textures for each frame
         m_texture_library.Bind(descriptor_heap, i);
 
-        // TODO: make sure meshes get handles to each texture so it doesnt need to keep accessing the map for it...
+        // Cache the handles to each texture for the scene items
         for (auto& scene_item : m_items) {
             for (const auto& tex : scene_item.mesh.GetTextures()) {
                 scene_item.resource_handles[i].push_back(descriptor_heap->FindResourceHandle(tex, i));
             }
         }
 
-        // Describe and create the scene constant buffer view (CBV) and 
-        // cache the GPU descriptor handle.
-        unsigned int bind_idx = descriptor_heap->Bind(&m_scene_constant_buffers[i], i);
-        m_scene_cbv_handles[i] = descriptor_heap->GetGpuHandle(bind_idx);
+        // Describe and create the scene constant buffer view (CBV) and cache the GPU descriptor handle
+        descriptor_heap->Bind(&m_scene_constant_buffers[i], i);
     }
+}
+
+void Scene::ComputeBoundingBox(DirectX::XMFLOAT3& min_bounds, DirectX::XMFLOAT3& max_bounds) 
+{
+    constexpr float min_fl = std::numeric_limits<float>::min();
+    constexpr float max_fl = std::numeric_limits<float>::max();
+    DirectX::XMVECTOR scene_min_bounds = DirectX::XMVectorSet(max_fl, max_fl, max_fl, 1.0f);
+    DirectX::XMVECTOR scene_max_bounds = DirectX::XMVectorSet(min_fl, min_fl, min_fl, 1.0f);
+
+    for (const auto& item : m_items) {
+        DirectX::XMFLOAT4 minb;
+        DirectX::XMFLOAT4 maxb;
+        item.mesh.GetBounds(minb, maxb);
+
+        // scale rotate translate
+        DirectX::XMMATRIX model = item.GetModelMatrix();
+        DirectX::XMVECTOR transformed_min_bounds = DirectX::XMVector4Transform(DirectX::XMLoadFloat4(&minb), model);
+        DirectX::XMVECTOR transformed_max_bounds = DirectX::XMVector4Transform(DirectX::XMLoadFloat4(&maxb), model);
+
+        // find min/max bounds
+        scene_min_bounds = DirectX::XMVectorMin(transformed_min_bounds, scene_min_bounds);
+        scene_max_bounds = DirectX::XMVectorMax(transformed_max_bounds, scene_max_bounds);
+    }
+
+    DirectX::XMStoreFloat3(&min_bounds, scene_min_bounds);
+    DirectX::XMStoreFloat3(&max_bounds, scene_max_bounds);
 }
 
 void Scene::CreateSceneBuffer() 

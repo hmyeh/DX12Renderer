@@ -10,6 +10,7 @@
 class UploadBuffer;
 class IDescriptorHeap;
 class IRenderTarget;
+class IDepthStencilTarget;
 
 class CommandList {
 private:
@@ -51,7 +52,7 @@ public:
 	void SetScissorRect(const D3D12_RECT& scissor_rect) { m_command_list->RSSetScissorRects(1, &scissor_rect); }
 
 	void SetRenderTargets(unsigned int num_rtvs, D3D12_CPU_DESCRIPTOR_HANDLE* render_target_views, D3D12_CPU_DESCRIPTOR_HANDLE* depth_stencil_view) { m_command_list->OMSetRenderTargets(num_rtvs, render_target_views, FALSE, depth_stencil_view); }
-	void SetRenderTargets(const std::vector<IRenderTarget*>& render_target_views, IRenderTarget* depth_stencil_view);
+	void SetRenderTargets(const std::vector<IRenderTarget*>& render_target_views, IDepthStencilTarget* depth_stencil_view);
 	void ClearRenderTargetView(const D3D12_CPU_DESCRIPTOR_HANDLE& rtv, const float clear_color[4]) { m_command_list->ClearRenderTargetView(rtv, clear_color, 0, nullptr); }
 	void ClearDepthStencilView(const D3D12_CPU_DESCRIPTOR_HANDLE& dsv, float depth) { m_command_list->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, depth, 0, 0, nullptr); }
 

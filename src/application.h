@@ -16,15 +16,14 @@ class Application {
 private:
     std::unique_ptr<Window> m_window;
     std::unique_ptr<Renderer> m_renderer;
-    Scene m_scene;
-    GUI m_gui;
+    std::unique_ptr<Scene> m_scene;
+    std::unique_ptr<GUI> m_gui;
 
     // Set to true once the DX12 objects have been initialized.
     bool m_initialized;
 
 public:
     Application(HINSTANCE hInstance, const wchar_t* instance_name, uint32_t width, uint32_t height, bool use_warp = false, bool fullscreen = false);
-
     ~Application();
 
     void Show() { m_window->Show(); }

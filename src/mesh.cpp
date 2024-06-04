@@ -15,16 +15,18 @@
 #include "texture.h"
 #include "commandqueue.h"
 
+
 // Declare the IMesh types to be used to avoid Linker errors https://isocpp.org/wiki/faq/templates#separate-template-fn-defn-from-decl
 template class IMesh<ScreenVertex>;
 template class IMesh<Vertex>;
 
 // ScreenQuad
+// DirectX has Top-left uv 0,0; Bottom-Left uv 0,1; Top-Right uv 1,0; Bottom-Right uv 1,1;  
 const std::vector<ScreenVertex> ScreenQuad::vertices{
-            { DirectX::XMFLOAT2(-1.0f, -1.0f), DirectX::XMFLOAT2(0.0f, 0.0f) }, // 0
-            { DirectX::XMFLOAT2(-1.0f,  1.0f), DirectX::XMFLOAT2(0.0f, 1.0f) }, // 1
-            { DirectX::XMFLOAT2(1.0f, 1.0f), DirectX::XMFLOAT2(1.0f, 1.0f) }, // 2
-            { DirectX::XMFLOAT2(1.0f, -1.0f), DirectX::XMFLOAT2(1.0f, 0.0f) }, // 3
+            { DirectX::XMFLOAT2(-1.0f, -1.0f), DirectX::XMFLOAT2(0.0f, 1.0f) }, // 0
+            { DirectX::XMFLOAT2(-1.0f,  1.0f), DirectX::XMFLOAT2(0.0f, 0.0f) }, // 1
+            { DirectX::XMFLOAT2(1.0f, 1.0f), DirectX::XMFLOAT2(1.0f, 0.0f) }, // 2
+            { DirectX::XMFLOAT2(1.0f, -1.0f), DirectX::XMFLOAT2(1.0f, 1.0f) }, // 3
 };
 
 const std::vector<uint32_t> ScreenQuad::indices{
@@ -146,4 +148,21 @@ Mesh Mesh::ReadFile(std::string file_name, TextureLibrary* texture_library) {
     }
 
     return Mesh(vertices, indices, diffuse_tex);
+}
+
+void Mesh::ComputeBounds() {
+    constexpr float min_fl = std::numeric_limits<float>::min();
+    constexpr float max_fl = std::numeric_limits<float>::max();
+    DirectX::XMVECTOR min_bounds = DirectX::XMVectorSet(max_fl, max_fl, max_fl, 1.0f);
+    DirectX::XMVECTOR max_bounds = DirectX::XMVectorSet(min_fl, min_fl, min_fl, 1.0f);
+
+    for (const Vertex& vert : m_vertices) {
+        DirectX::XMVECTOR pos = DirectX::XMLoadFloat3(&vert.position);
+        DirectX::XMVectorSetW(pos, 1.0f);
+        min_bounds = DirectX::XMVectorMin(pos, min_bounds);
+        max_bounds = DirectX::XMVectorMax(pos, max_bounds);
+    }
+
+    DirectX::XMStoreFloat4(&m_min_bounds, min_bounds);
+    DirectX::XMStoreFloat4(&m_max_bounds, max_bounds);
 }

@@ -6,51 +6,62 @@
 
 /// Gpu Resource
 
-// naive way to do this
 void GpuResource::TransitionResourceState(CommandList& command_list, D3D12_RESOURCE_STATES updated_state) {
+    if (updated_state == m_resource_state)
+        throw std::exception("Transition to same state..");
     command_list.ResourceBarrier(m_resource.Get(), m_resource_state, updated_state);
     m_resource_state = updated_state; // state should only actually change after execution of the command list....
 }
 
-void GpuResource::BindRenderTargetView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_RENDER_TARGET_VIEW_DESC* desc) 
+// IShader Resource
+
+IShaderResource::IShaderResource() : m_shader_visible_cpu_handles(Renderer::s_num_frames), m_shader_visible_gpu_handles(Renderer::s_num_frames), m_srv_handle{}  {}
+
+void IShaderResource::CreateShaderResourceView(ID3D12Resource* resource, const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_SHADER_RESOURCE_VIEW_DESC* desc)
 {
     Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
-    if (m_rtv_handle.ptr) {
-        device->CopyDescriptorsSimple(1, handle, m_rtv_handle, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-    }
-    else {
-        device->CreateRenderTargetView(m_resource.Get(), desc, handle);
-        m_rtv_handle = handle;
+
+    device->CreateShaderResourceView(resource, desc, handle);
+    m_srv_handle = handle;
+}
+
+void IShaderResource::BindShaderResourceView(unsigned int frame_idx, const D3D12_CPU_DESCRIPTOR_HANDLE& cpu_handle, const D3D12_GPU_DESCRIPTOR_HANDLE& gpu_handle)
+{
+    Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
+
+    if (!m_srv_handle.ptr)
+        throw std::exception();
+
+    device->CopyDescriptorsSimple(1, cpu_handle, m_srv_handle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+    // Cache the descriptor handles
+    m_shader_visible_cpu_handles[frame_idx] = cpu_handle;
+    m_shader_visible_gpu_handles[frame_idx] = gpu_handle;
+}
+
+void IShaderResource::ResourceChanged(ID3D12Resource* resource)
+{
+    // recreate
+    CreateShaderResourceView(resource, m_srv_handle);
+
+    for (unsigned int frame_idx = 0; frame_idx < Renderer::s_num_frames; ++frame_idx) {
+        if (m_shader_visible_cpu_handles[frame_idx].ptr) {
+            BindShaderResourceView(frame_idx, m_shader_visible_cpu_handles[frame_idx], m_shader_visible_gpu_handles[frame_idx]);
+        }
     }
 }
 
-void GpuResource::BindDepthStencilView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_DEPTH_STENCIL_VIEW_DESC* desc) 
-{
-    Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
-    // Update the depth-stencil view.
-    //D3D12_DEPTH_STENCIL_VIEW_DESC dsv = {};
-    //dsv.Format = DXGI_FORMAT_D32_FLOAT;
-    //dsv.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-    //dsv.Texture2D.MipSlice = 0;
-    //dsv.Flags = D3D12_DSV_FLAG_NONE;
-    if (m_dsv_handle.ptr) {
-        device->CopyDescriptorsSimple(1, handle, m_dsv_handle, D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-    }
-    else {
-        device->CreateDepthStencilView(m_resource.Get(), desc, handle);
-        m_dsv_handle = handle;
-    }
-}
+// IConstant Buffer Resource
 
-void GpuResource::BindConstantBufferView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle)
+void IConstantBufferResource::CreateConstantBufferView(ID3D12Resource* resource, const D3D12_CPU_DESCRIPTOR_HANDLE& handle, const D3D12_GPU_DESCRIPTOR_HANDLE& gpu_handle)
 {
     Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
 
-    if (m_cbv_handle.ptr) {
-        device->CopyDescriptorsSimple(1, handle, m_cbv_handle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    if (m_cbv_cpu_handle.ptr) {
+        device->CopyDescriptorsSimple(1, handle, m_cbv_cpu_handle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
     else {
-        D3D12_RESOURCE_DESC resource_desc = m_resource->GetDesc();
+        D3D12_RESOURCE_DESC resource_desc = resource->GetDesc();
         unsigned int array_size = (resource_desc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE3D) ? resource_desc.DepthOrArraySize : 1u;
         unsigned int num_subresources = resource_desc.MipLevels * array_size; // * PlaneCount (for constant buffer assume DXGI_FORMAT_UNKNOWN)
 
@@ -58,35 +69,21 @@ void GpuResource::BindConstantBufferView(const D3D12_CPU_DESCRIPTOR_HANDLE& hand
         device->GetCopyableFootprints(&resource_desc, 0, num_subresources, 0, nullptr, nullptr, nullptr, &buffer_size);
 
         D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc = {};
-        cbv_desc.BufferLocation = m_resource->GetGPUVirtualAddress();
+        cbv_desc.BufferLocation = resource->GetGPUVirtualAddress();
         cbv_desc.SizeInBytes = buffer_size;    // CB size is required to be 256-byte aligned.
 
         device->CreateConstantBufferView(&cbv_desc, handle);
-        m_cbv_handle = handle;
+        m_cbv_cpu_handle = handle;
+        m_cbv_gpu_handle = gpu_handle;
     }
 }
 
-void GpuResource::BindShaderResourceView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_SHADER_RESOURCE_VIEW_DESC* desc) 
-{
-    Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
-
-    if (m_srv_handle.ptr) {
-        device->CopyDescriptorsSimple(1, handle, m_srv_handle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    }
-    else {
-        device->CreateShaderResourceView(m_resource.Get(), desc, handle);
-        m_srv_handle = handle;
-    }
-}
 
 
 /// Upload Buffer
 
 void UploadBuffer::Create(size_t buffer_size) 
 {
-    // Destroy any previous resource
-    //Destroy();
-
     Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
     auto upload_heap_props = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
     auto upload_heap_resource_desc = CD3DX12_RESOURCE_DESC::Buffer(buffer_size);
@@ -101,6 +98,7 @@ void UploadBuffer::Create(size_t buffer_size)
 
     // Set appropriate initial resource state
     m_resource_state = D3D12_RESOURCE_STATE_GENERIC_READ;
+    m_resource->SetName(L"Upload Buffer");
 }
 
 void UploadBuffer::Map(unsigned int subresource, const D3D12_RANGE* read_range, void** buffer_WO)
@@ -131,6 +129,7 @@ void GpuBuffer<T>::Create(size_t num_elements)
 
     // Set appropriate initial resource state
     m_resource_state = D3D12_RESOURCE_STATE_COPY_DEST;
+    m_resource->SetName(L"Templated Gpu Buffer");
 }
 
 template <class T>
@@ -174,54 +173,3 @@ D3D12_INDEX_BUFFER_VIEW GpuBuffer<T>::GetIndexBufferView() const requires IsInde
 template class GpuBuffer<ScreenVertex>;
 template class GpuBuffer<Vertex>;
 template class GpuBuffer<uint32_t>;
-
-// RenderBuffer
-void RenderBuffer::Create(const Microsoft::WRL::ComPtr<IDXGISwapChain4>& swap_chain, unsigned int frame_idx) {
-    if (frame_idx > Renderer::s_num_frames)
-        throw std::exception("Illegal too high framecount");
-
-    Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
-
-    ThrowIfFailed(swap_chain->GetBuffer(frame_idx, IID_PPV_ARGS(&m_resource)));
-    // Set to default resource state
-    m_resource_state = D3D12_RESOURCE_STATE_PRESENT;
-}
-
-
-void RenderBuffer::Clear(CommandList& command_list) {
-    // Clearing the buffer means set state to rendertarget
-    TransitionResourceState(command_list, D3D12_RESOURCE_STATE_RENDER_TARGET);
-    FLOAT clear_color[] = { 0.4f, 0.6f, 0.9f, 1.0f };
-    command_list.ClearRenderTargetView(m_rtv_handle, clear_color);
-}
-
-// DepthBuffer
-void DepthBuffer::Create(uint32_t width, uint32_t height) {
-    // Resize screen dependent resources.
-// Create a depth buffer.
-    D3D12_CLEAR_VALUE optimizedClearValue = {};
-    optimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-    optimizedClearValue.DepthStencil = { 1.0f, 0 };
-
-    Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
-    auto heap_props = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-    auto resource_desc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, width, height,
-        1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
-
-    ThrowIfFailed(device->CreateCommittedResource(
-        &heap_props,
-        D3D12_HEAP_FLAG_NONE,
-        &resource_desc,
-        D3D12_RESOURCE_STATE_DEPTH_WRITE,
-        &optimizedClearValue,
-        IID_PPV_ARGS(&m_resource)
-    ));
-
-    // Update resource state
-    m_resource_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-}
-
-void DepthBuffer::Clear(CommandList& command_list) {
-    float depth = 1.0f;
-    command_list.ClearDepthStencilView(m_dsv_handle, depth);
-}

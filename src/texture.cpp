@@ -6,45 +6,60 @@
 #include "renderer.h"
 
 
-// Texture
+// ITexture
 
-void Texture::Create(DirectX::TEX_DIMENSION dimensions, DXGI_FORMAT format, uint32_t width, uint32_t height, uint32_t depth, uint32_t mip_levels, D3D12_RESOURCE_FLAGS flags) 
+void ITexture::Create(D3D12_RESOURCE_DIMENSION dimension, DXGI_FORMAT format, uint32_t width, uint32_t height, uint32_t depth, uint32_t mip_levels, const D3D12_CLEAR_VALUE& clear_value, bool use_clear_value, D3D12_RESOURCE_FLAGS flags)
 {
-    CD3DX12_RESOURCE_DESC heap_resource_desc;
-    switch (dimensions) {
-    case DirectX::TEX_DIMENSION_TEXTURE2D:
-        heap_resource_desc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, depth, mip_levels, 1, 0, flags);
+    //CD3DX12_RESOURCE_DESC heap_resource_desc;
+    switch (dimension) {
+    case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
+        m_resource_desc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, depth, mip_levels, 1, 0, flags);
         break;
-    case DirectX::TEX_DIMENSION_TEXTURE3D:
-        heap_resource_desc = CD3DX12_RESOURCE_DESC::Tex3D(format, width, height, depth, mip_levels, flags);
+    case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
+        m_resource_desc = CD3DX12_RESOURCE_DESC::Tex3D(format, width, height, depth, mip_levels, flags);
         break;
-    case DirectX::TEX_DIMENSION_TEXTURE1D:
-        heap_resource_desc = CD3DX12_RESOURCE_DESC::Tex1D(format, width, depth, mip_levels, flags);
+    case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
+        m_resource_desc = CD3DX12_RESOURCE_DESC::Tex1D(format, width, depth, mip_levels, flags);
         break;
     default:
         throw std::exception();
     }
 
-    auto heap_props = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
     Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
-    // Create a committed resource for the GPU resource in a default heap.
-    ThrowIfFailed(device->CreateCommittedResource(
-        &heap_props,
-        D3D12_HEAP_FLAG_NONE,
-        &heap_resource_desc,
-        D3D12_RESOURCE_STATE_COPY_DEST, //hmm if no texture needs to be uploaded maybe different state...
-        nullptr,
-        IID_PPV_ARGS(&m_resource)));
+    auto heap_props = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
-    // TODO: other way to differentiate RenderTarget and DSV target
+    m_use_clear_value = use_clear_value;
+    if (use_clear_value) {
+        m_clear_value = clear_value;
+        // Create a committed resource for the GPU resource in a default heap.
+        ThrowIfFailed(device->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &m_resource_desc, m_resource_state, &clear_value,
+            IID_PPV_ARGS(&m_resource)));
+    }
+    else {
+        // Create a committed resource for the GPU resource in a default heap.
+        ThrowIfFailed(device->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &m_resource_desc, m_resource_state, nullptr,
+            IID_PPV_ARGS(&m_resource)));
+    }
     m_flags = flags;
-    // Set appropriate initial resource state
-    m_resource_state = D3D12_RESOURCE_STATE_COPY_DEST;
+    
 }
 
+// Texture 
 
-void Texture::Upload(CommandList& command_list) 
+void Texture::Create(D3D12_RESOURCE_DIMENSION dimension, DXGI_FORMAT format, uint32_t width, uint32_t height, uint32_t depth, uint32_t mip_levels, D3D12_RESOURCE_FLAGS flags)
+{
+    // Set appropriate initial resource state
+    m_resource_state = D3D12_RESOURCE_STATE_COPY_DEST;
+
+    // Create the resource
+    ITexture::Create(dimension, format, width, height, depth, mip_levels, {}, false, flags);
+
+    m_resource->SetName(L"Texture");
+
+}
+
+void Texture::Upload(CommandList& command_list)
 {
     // upload only works if it has an m_image
     if (m_image.GetImageCount() == 0) {
@@ -67,10 +82,10 @@ void Texture::Upload(CommandList& command_list)
 
     // Upload data and update resource state
     command_list.UploadBufferData(required_size, m_resource.Get(), subresources.size(), subresources.data());
-    TransitionResourceState(command_list, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE); 
+    TransitionResourceState(command_list, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 }
 
-void Texture::Read(const std::wstring& file_name) 
+void Texture::Read(const std::wstring& file_name)
 {
     std::filesystem::path file_path(file_name);
 
@@ -86,37 +101,67 @@ void Texture::Read(const std::wstring& file_name)
     else
         ThrowIfFailed(DirectX::LoadFromWICFile(file_name.c_str(), DirectX::WIC_FLAGS_FORCE_RGB, &m_metadata, m_image));
 
-    Create(m_metadata.dimension, m_metadata.format, m_metadata.width, m_metadata.height, m_metadata.depth, m_metadata.mipLevels);
+    Create(static_cast<D3D12_RESOURCE_DIMENSION>(m_metadata.dimension), m_metadata.format, m_metadata.width, m_metadata.height, m_metadata.depth, m_metadata.mipLevels, {});
 
 }
 
-void Texture::Clear(CommandList& command_list) 
+
+// RenderTargetTexture
+
+void RenderTargetTexture::Create(D3D12_RESOURCE_DIMENSION dimension, DXGI_FORMAT format, uint32_t width, uint32_t height, uint32_t depth, uint32_t mip_levels, D3D12_RESOURCE_FLAGS flags)
 {
-    if ((m_flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET) == D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET) {
-        // Clearing the buffer means set state to rendertarget
-        TransitionResourceState(command_list, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        FLOAT clear_color[] = { 0.4f, 0.6f, 0.9f, 1.0f };
-        command_list.ClearRenderTargetView(m_rtv_handle, clear_color);
-    }
-    else if ((m_flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) == D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) {
-        // Clearing the buffer means set state to rendertarget
-        TransitionResourceState(command_list, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-        float depth = 1.0f;
-        command_list.ClearDepthStencilView(m_dsv_handle, depth);
-    }
+    // Set appropriate initial resource state
+    m_resource_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+    // Optimized clear value
+    D3D12_CLEAR_VALUE clear_value = {};
+    clear_value.Format = format;
+    clear_value.Color[0] = IRenderTarget::s_clear_value[0];
+    clear_value.Color[1] = IRenderTarget::s_clear_value[1];
+    clear_value.Color[2] = IRenderTarget::s_clear_value[2];
+    clear_value.Color[3] = IRenderTarget::s_clear_value[3];
+
+    // Create the resource
+    ITexture::Create(dimension, format, width, height, depth, mip_levels, clear_value, true, flags | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+
+    m_resource->SetName(L"Render Target Texture");
+    
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE Texture::GetHandle() const 
+void RenderTargetTexture::ClearRenderTarget(CommandList& command_list)
 {
-    if ((m_flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET) == D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET) {
-        return GetRTVHandle();
-    }
-    else if ((m_flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) == D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) {
-        return GetDSVHandle();
-    }
-    return D3D12_CPU_DESCRIPTOR_HANDLE{};
+    // Clearing the buffer means set state to rendertarget
+    TransitionResourceState(command_list, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    command_list.ClearRenderTargetView(m_rtv_handle, IRenderTarget::s_clear_value);
 }
 
+// DepthMapTexture
+
+void DepthMapTexture::Create(D3D12_RESOURCE_DIMENSION dimension, DXGI_FORMAT format, uint32_t width, uint32_t height, uint32_t depth, uint32_t mip_levels, D3D12_RESOURCE_FLAGS flags)
+{
+    // Set appropriate initial resource state
+    m_resource_state = D3D12_RESOURCE_STATE_COPY_DEST;
+
+    // Optimized clear value
+    D3D12_CLEAR_VALUE clear_value = {};
+    clear_value.Format = IDepthStencilTarget::TypelessToDepthStencilFormat(format);
+    clear_value.DepthStencil = IDepthStencilTarget::s_clear_value;
+
+    // Create the resource
+    ITexture::Create(dimension, format, width, height, depth, mip_levels, clear_value, true, flags | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+
+    m_resource->SetName(L"Depth Stencil Texture");
+}
+
+void DepthMapTexture::ClearDepthStencil(CommandList& command_list)
+{
+    // Clearing the buffer means set state to rendertarget
+    TransitionResourceState(command_list, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+    command_list.ClearDepthStencilView(m_dsv_handle, IDepthStencilTarget::s_clear_value.Depth);
+}
+
+
+/// Texture Library
 
 // set static samplers
 std::unique_ptr<DescriptorHeap> TextureLibrary::s_sampler_heap = TextureLibrary::CreateSamplers();
@@ -126,7 +171,8 @@ TextureLibrary::TextureLibrary() :
     m_command_queue(CommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT)),
     m_srv_heap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV),
     m_rtv_heap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV),
-    m_dsv_heap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV)
+    m_dsv_heap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV),
+    m_frame_descriptor_heap(nullptr)
 {
 }
 
@@ -156,6 +202,7 @@ void TextureLibrary::AllocateDescriptors()
 
 void TextureLibrary::Bind(FrameDescriptorHeap* descriptor_heap)
 {
+    m_frame_descriptor_heap = descriptor_heap;
     for (unsigned int frame_idx = 0; frame_idx < Renderer::s_num_frames; ++frame_idx) {
         Bind(descriptor_heap, frame_idx);
     }
@@ -167,7 +214,7 @@ void TextureLibrary::Bind(FrameDescriptorHeap* descriptor_heap, unsigned int fra
         throw std::exception("Binding illegal frame descriptor heap");
 
     // Binding all textures with ShaderResourceView
-    for (const auto& [name, texture] : m_srv_texture_map) {
+    for (auto& [name, texture] : m_srv_texture_map) {
         descriptor_heap->Bind(texture.get(), frame_idx);
     }
 
@@ -194,19 +241,22 @@ Texture* TextureLibrary::CreateTexture(std::wstring file_name)
     return m_srv_texture_map[file_name].get();
 }
 
-Texture* TextureLibrary::CreateRenderTargetTexture(DXGI_FORMAT format, uint32_t width, uint32_t height) {
-    std::unique_ptr<Texture> texture = std::make_unique<Texture>();
-    texture->Create(DirectX::TEX_DIMENSION_TEXTURE2D, format, width, height, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+RenderTargetTexture* TextureLibrary::CreateRenderTargetTexture(DXGI_FORMAT format, uint32_t width, uint32_t height)
+{
+    std::unique_ptr<RenderTargetTexture> texture = std::make_unique<RenderTargetTexture>();
+    texture->Create(D3D12_RESOURCE_DIMENSION_TEXTURE2D, format, width, height, 1, 1);
     m_rtv_textures.push_back(std::move(texture));
     return m_rtv_textures.back().get();
 }
 
-Texture* TextureLibrary::CreateDepthTexture(DXGI_FORMAT format, uint32_t width, uint32_t height) {
-    std::unique_ptr<Texture> texture = std::make_unique<Texture>();
-    texture->Create(DirectX::TEX_DIMENSION_TEXTURE2D, format, width, height, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+DepthMapTexture* TextureLibrary::CreateDepthTexture(DXGI_FORMAT format, uint32_t width, uint32_t height)
+{
+    std::unique_ptr<DepthMapTexture> texture = std::make_unique<DepthMapTexture>();
+    texture->Create(D3D12_RESOURCE_DIMENSION_TEXTURE2D, format, width, height, 1, 1);
     m_dsv_textures.push_back(std::move(texture));
     return m_dsv_textures.back().get();
 }
+
 
 void TextureLibrary::Load() 
 {
@@ -222,6 +272,20 @@ void TextureLibrary::Load()
 
     auto fence_value = m_command_queue.ExecuteCommandList(command_list);
     m_command_queue.WaitForFenceValue(fence_value);
+}
+
+
+void TextureLibrary::Reset() {
+    m_command_queue.Flush();
+
+    // Clear and reset everything
+    m_srv_texture_map.clear();
+    m_rtv_textures.clear();
+    m_dsv_textures.clear();
+
+    m_srv_heap.Reset();
+    m_rtv_heap.Reset();
+    m_dsv_heap.Reset();
 }
 
 
