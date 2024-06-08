@@ -118,6 +118,22 @@ void Scene::ReadXmlFile(const std::string& xml_file)
     if (!scene)
         throw std::exception("XML does not contain scene element");
     
+    // Parse Directional Light
+    tinyxml2::XMLElement* light = scene->FirstChildElement("light");
+    std::string dir_str = light->FirstChildElement("direction")->FirstChild()->Value();
+    std::vector<std::string> dir_split = SplitString(dir_str, ",");
+    if (dir_split.size() != 3)
+        throw std::exception("Incorrect number of directional light elements parsed in XML");
+    DirectX::XMFLOAT4 direction(std::stof(dir_split[0]), std::stof(dir_split[1]), std::stof(dir_split[2]), 0.0f);
+    m_directional_light.SetDirection(direction);
+
+    std::string color_str = light->FirstChildElement("color")->FirstChild()->Value();
+    std::vector<std::string> color_split = SplitString(color_str, ",");
+    if (color_split.size() != 4)
+        throw std::exception("Incorrect number of color elements parsed in XML");
+    DirectX::XMFLOAT4 color(std::stof(color_split[0]), std::stof(color_split[1]), std::stof(color_split[2]), std::stof(color_split[3]));
+    m_directional_light.SetColor(color);
+
     // Parse the scene items
     tinyxml2::XMLElement*  item = scene->FirstChildElement("item");
     while (item) {

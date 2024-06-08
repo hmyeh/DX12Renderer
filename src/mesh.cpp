@@ -168,7 +168,7 @@ void Mesh::ComputeBounds()
 
     for (const Vertex& vert : m_vertices) {
         DirectX::XMVECTOR pos = DirectX::XMLoadFloat3(&vert.position);
-        DirectX::XMVectorSetW(pos, 1.0f);
+        pos = DirectX::XMVectorSetW(pos, 1.0f);
         min_bounds = DirectX::XMVectorMin(pos, min_bounds);
         max_bounds = DirectX::XMVectorMax(pos, max_bounds);
     }

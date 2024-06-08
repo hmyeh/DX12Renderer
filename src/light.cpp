@@ -20,11 +20,11 @@ void DirectionalLight::Update(const DirectX::XMFLOAT3& min_bounds, const DirectX
 	if (std::abs(m_light_data.direction.x) < eps && std::abs(m_light_data.direction.z) < eps) {
 		// Slightly move the direction vector and normalize
 		m_light_data.direction.x += eps;
-		XMVECTOR direction_vec = XMVector4Normalize(XMLoadFloat4(&m_light_data.direction));
-		XMStoreFloat4(&m_light_data.direction, direction_vec);
+		SetDirection(m_light_data.direction);
 	}
 	DirectX::XMVECTOR light_dir = XMLoadFloat4(&m_light_data.direction);
 
+	// Scale bounds to ensure the orthographic projection contains the scene when rotated
 	XMVECTOR max_bounds_vec = XMLoadFloat3(&max_bounds);
 	XMVECTOR min_bounds_vec = XMLoadFloat3(&min_bounds);
 	XMVECTOR bounds_vec = XMVectorAbs(max_bounds_vec - min_bounds_vec);
@@ -33,23 +33,28 @@ void DirectionalLight::Update(const DirectX::XMFLOAT3& min_bounds, const DirectX
 	XMVECTOR target = 0.5f * bounds_vec + min_bounds_vec;
 	XMVECTOR position = target - light_dir;
 	// XMMatrixLookAtLH does not work straight down or up, due to using cross product on (pos-center) x up (parallel vectors) -> 0
-	XMMATRIX light_view = XMMatrixLookAtLH(position, target, XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
+	XMMATRIX light_view = XMMatrixLookAtLH(position, target, DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
 
 	// Transform AABB to light view space and recompute bounds
 	XMVECTOR transformed_min_bounds = XMVector3Transform(min_bounds_vec, light_view);
 	XMVECTOR transformed_max_bounds = XMVector3Transform(max_bounds_vec, light_view);
 	XMFLOAT3 proj_max_bounds;
 	XMFLOAT3 proj_min_bounds;
-	XMStoreFloat3(&proj_max_bounds, XMVectorMax(transformed_min_bounds, transformed_max_bounds));
-	XMStoreFloat3(&proj_min_bounds, XMVectorMin(transformed_min_bounds, transformed_max_bounds));
+	DirectX::XMStoreFloat3(&proj_max_bounds, XMVectorMax(transformed_min_bounds, transformed_max_bounds));
+	DirectX::XMStoreFloat3(&proj_min_bounds, XMVectorMin(transformed_min_bounds, transformed_max_bounds));
 
 	// Construct the projection matrix with the computed bounds
 	float view_width = std::abs(proj_max_bounds.x - proj_min_bounds.x);
-	float view_height = std::abs(proj_max_bounds.z - proj_min_bounds.z);
-	float near_plane = proj_min_bounds.y;
-	float far_plane = proj_max_bounds.y;
-	XMMATRIX light_projection = DirectX::XMMatrixOrthographicLH(view_width, view_height, near_plane, far_plane);
-
+	float view_height = std::abs(proj_max_bounds.y - proj_min_bounds.y);
+	float near_plane = proj_min_bounds.z;
+	float far_plane = proj_max_bounds.z;
+	XMMATRIX light_projection = DirectX::XMMatrixOrthographicLH(view_width, view_height, -10.0f, 10.0f);// near_plane, far_plane);
 	// Send transpose to hlsl shader as transpose matrix
 	m_light_data.lightspace_mat = XMMatrixMultiplyTranspose(light_view, light_projection);
+}
+
+void DirectionalLight::SetDirection(const DirectX::XMFLOAT4& direction)
+{ 
+	DirectX::XMVECTOR dir = DirectX::XMVector4Normalize(DirectX::XMLoadFloat4(&direction));
+	XMStoreFloat4(&m_light_data.direction, dir);
 }

@@ -1,14 +1,24 @@
 <scene>
+	<light>
+		<direction>0.0, -0.6, 0.3</direction>
+		<color>1.0, 1.0, 1.0, 1.0</color>
+	</light>
 	<item>
-		<mesh>resource/box.obj</mesh>
-		<position>0.0, 2.0, 0.0</position>
+		<mesh>resource/wall.obj</mesh>
+		<position>0.0, 0.5, 3.0</position>
 		<rotation>0.0, 0.0, 0.0</rotation>
 		<scale>1.0, 1.0, 1.0</scale>
 	</item>
 	<item>
-		<mesh>resource/box.obj</mesh>
-		<position>0.0, 0.0, 0.0</position>
+		<mesh>resource/floor.obj</mesh>
+		<position>0.0, -1.0, 0.0</position>
 		<rotation>0.0, 0.0, 0.0</rotation>
-		<scale>5.0, 0.5, 5.0</scale>
+		<scale>1.0, 1.0, 1.0</scale>
+	</item>
+	<item>
+		<mesh>resource/xyzrgb_dragon.obj</mesh>
+		<position>0.0, 0.25, -1.0</position>
+		<rotation>0.0, 1.5707963, 0.0</rotation>
+		<scale>0.025, 0.025, 0.025</scale>
 	</item>
 </scene>

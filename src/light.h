@@ -39,5 +39,8 @@ public:
 
 	DepthMapTexture* GetDepthMap() { return m_depthmap; }
 	const DirectionalLightData& GetLightData() const { return m_light_data; }
+
+	void SetDirection(const DirectX::XMFLOAT4& direction);
+	void SetColor(const DirectX::XMFLOAT4& color) { m_light_data.color = color; }
 };
 
