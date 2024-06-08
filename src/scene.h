@@ -1,6 +1,5 @@
 #pragma once
 
-#define NOMINMAX
 #include <DirectXMath.h>
 
 #include <vector>
@@ -26,9 +25,9 @@ public:
         DirectX::XMFLOAT4 position;
         DirectX::XMFLOAT4 rotation; // quaternion
         DirectX::XMFLOAT4 scale;
-        std::array<std::vector<D3D12_GPU_DESCRIPTOR_HANDLE>, Renderer::s_num_frames> resource_handles;// [Renderer::s_num_frames] ;
 
-        Item(const Mesh& mesh, const DirectX::XMFLOAT4& position = DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f), const DirectX::XMVECTOR& rotation = DirectX::XMQuaternionIdentity(), const DirectX::XMFLOAT4& scale = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f)) :
+        Item(const Mesh& mesh, const DirectX::XMFLOAT4& position = DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f), const DirectX::XMVECTOR& rotation = DirectX::XMQuaternionIdentity(), 
+            const DirectX::XMFLOAT4& scale = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f)) :
             mesh(mesh), position(position), scale(scale) 
         {
             DirectX::XMStoreFloat4(&this->rotation, rotation);
@@ -53,7 +52,6 @@ private:
     SceneConstantBuffer* m_scene_consts_buffer_WO[Renderer::s_num_frames]; //WRITE ONLY POINTER
     // resource to store the scene constant buffer
     UploadBuffer m_scene_constant_buffers[Renderer::s_num_frames];
-    //D3D12_GPU_DESCRIPTOR_HANDLE m_scene_cbv_handles[Renderer::s_num_frames];
 
 	// Commandqueue for copying
 	CommandQueue m_command_queue;
@@ -71,10 +69,9 @@ private:
 
 public:
 	Scene();
-	~Scene(); // TODO: not properly destroying the scene at close
+	~Scene();
 
-
-    // create the gpu/upload buffers needed for the 
+    // Load the resources in the scene from CPU to GPU
     void LoadResources();
 
     // Update the scene constant buffer for the current frame index
@@ -96,7 +93,7 @@ public:
 
     void ReadXmlFile(const std::string& xml_file);
 
-    void Flush() { m_command_queue.Flush(); /*m_texture_library.Flush();*/ }
+    void Flush() { m_command_queue.Flush(); m_texture_library.Flush(); }
 private:
     void CreateSceneBuffer();
 };

@@ -36,10 +36,13 @@ class IResourceType {
     // dummy class
 };
 
+
+// Class for dealing with shader resource descriptors
 class IShaderResource : public IResourceType {
 private:
-    // cpu only handle
-    D3D12_CPU_DESCRIPTOR_HANDLE m_srv_handle; // local non-shadervisible heap handle
+    // Local non-shader visible heap handle
+    D3D12_CPU_DESCRIPTOR_HANDLE m_srv_handle; 
+    // Descriptors used to bind to FrameDescriptorHeap
     std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> m_shader_visible_cpu_handles;
     std::vector<D3D12_GPU_DESCRIPTOR_HANDLE> m_shader_visible_gpu_handles;
 
@@ -48,15 +51,17 @@ protected:
 
 public:
     IShaderResource();
+
     D3D12_CPU_DESCRIPTOR_HANDLE GetShaderCPUHandle() const { return m_srv_handle; }
     D3D12_GPU_DESCRIPTOR_HANDLE GetShaderGPUHandle(unsigned int frame_idx) const { return m_shader_visible_gpu_handles[frame_idx]; }
     void BindShaderResourceView(unsigned int frame_idx, const D3D12_CPU_DESCRIPTOR_HANDLE& cpu_handle, const D3D12_GPU_DESCRIPTOR_HANDLE& gpu_handle);
-    // in case resource has been reset and recreated for resize
+    
+    // Used in case resource has been reset and recreated for resize
     void ResourceChanged(ID3D12Resource* resource);
 };
 
 
-//
+// Class for dealing with Constant buffer descriptors
 class IConstantBufferResource : public IResourceType {
 private:
     D3D12_CPU_DESCRIPTOR_HANDLE m_cbv_cpu_handle;
@@ -70,7 +75,7 @@ public:
     D3D12_GPU_DESCRIPTOR_HANDLE GetBufferGPUHandle() const { return m_cbv_gpu_handle; }
 };
 
-// Used to upload texture and mesh data to the GPU via Commited resources
+// Used to upload texture and mesh data to the GPU via Commited resources and as constant buffer
 class UploadBuffer : public GpuResource, public IConstantBufferResource {
 public:
     UploadBuffer() : GpuResource(), IConstantBufferResource() {

@@ -1,6 +1,5 @@
 #pragma once
 
-#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 // STL Headers
@@ -31,10 +30,7 @@ public:
     // Handle Windows messages
     LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
 
-
     // Game Loop
-    void update();
-
-    //void resize();
+    void Update();
 
 };

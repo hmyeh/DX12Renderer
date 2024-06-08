@@ -19,6 +19,7 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_command_allocator;
 
+	// Store uploadbuffers for recorded upload commands
 	std::vector<UploadBuffer> m_upload_buffers;
 public:
 	CommandList(Microsoft::WRL::ComPtr<ID3D12CommandAllocator> command_allocator, D3D12_COMMAND_LIST_TYPE command_list_type);
@@ -40,24 +41,20 @@ public:
 
 	// Root Signature
 	void SetGraphicsRootSignature(ID3D12RootSignature* root_signature) { m_command_list->SetGraphicsRootSignature(root_signature); }
-	void SetDescriptorHeaps(unsigned int num_heaps, ID3D12DescriptorHeap** heaps) { m_command_list->SetDescriptorHeaps(num_heaps, heaps); }
 	void SetGraphicsRootDescriptorTable(unsigned int param_idx, const D3D12_GPU_DESCRIPTOR_HANDLE& descriptor) { m_command_list->SetGraphicsRootDescriptorTable(param_idx, descriptor); }
 	void SetGraphicsRoot32BitConstants(unsigned int root_param_idx, unsigned int num_values, const void* data,  unsigned int num_offset_values) { m_command_list->SetGraphicsRoot32BitConstants(root_param_idx, num_values, data, num_offset_values); }
-
-	// descriptor heap should only be set once
 	void SetDescriptorHeaps(std::vector<IDescriptorHeap*> heaps);
 
-	// Render target
+	// Viewport and scissorRect
 	void SetViewport(const D3D12_VIEWPORT& viewport) { m_command_list->RSSetViewports(1, &viewport); }
 	void SetScissorRect(const D3D12_RECT& scissor_rect) { m_command_list->RSSetScissorRects(1, &scissor_rect); }
 
-	void SetRenderTargets(unsigned int num_rtvs, D3D12_CPU_DESCRIPTOR_HANDLE* render_target_views, D3D12_CPU_DESCRIPTOR_HANDLE* depth_stencil_view) { m_command_list->OMSetRenderTargets(num_rtvs, render_target_views, FALSE, depth_stencil_view); }
+	// Render target
 	void SetRenderTargets(const std::vector<IRenderTarget*>& render_target_views, IDepthStencilTarget* depth_stencil_view);
 	void ClearRenderTargetView(const D3D12_CPU_DESCRIPTOR_HANDLE& rtv, const float clear_color[4]) { m_command_list->ClearRenderTargetView(rtv, clear_color, 0, nullptr); }
 	void ClearDepthStencilView(const D3D12_CPU_DESCRIPTOR_HANDLE& dsv, float depth) { m_command_list->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, depth, 0, 0, nullptr); }
 
 	void DrawIndexedInstanced(unsigned int num_indices, unsigned int num_instances) { m_command_list->DrawIndexedInstanced(num_indices, num_instances, 0, 0, 0); }
-
 
 	void ResourceBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES state_before, D3D12_RESOURCE_STATES state_after);
 

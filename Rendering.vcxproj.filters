@@ -16,9 +16,6 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{81fadffc-a6be-48ab-986f-1aae05763290}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders\image">
-      <UniqueIdentifier>{0939c999-a669-4082-aa52-1bda34644651}</UniqueIdentifier>
-    </Filter>
     <Filter Include="imgui">
       <UniqueIdentifier>{41c9740a-5282-4e0f-b9ff-f8d3daf73955}</UniqueIdentifier>
     </Filter>
@@ -190,13 +187,13 @@
     <FxCompile Include="shaders\vertex.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="shaders\image\image_vs.hlsl">
-      <Filter>Shaders\image</Filter>
-    </FxCompile>
-    <FxCompile Include="shaders\image\image_ps.hlsl">
-      <Filter>Shaders\image</Filter>
-    </FxCompile>
     <FxCompile Include="shaders\depthmap_vs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="shaders\image_ps.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="shaders\image_vs.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

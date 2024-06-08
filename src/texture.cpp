@@ -10,7 +10,6 @@
 
 void ITexture::Create(D3D12_RESOURCE_DIMENSION dimension, DXGI_FORMAT format, uint32_t width, uint32_t height, uint32_t depth, uint32_t mip_levels, const D3D12_CLEAR_VALUE& clear_value, bool use_clear_value, D3D12_RESOURCE_FLAGS flags)
 {
-    //CD3DX12_RESOURCE_DESC heap_resource_desc;
     switch (dimension) {
     case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
         m_resource_desc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, depth, mip_levels, 1, 0, flags);
@@ -63,7 +62,7 @@ void Texture::Upload(CommandList& command_list)
 {
     // upload only works if it has an m_image
     if (m_image.GetImageCount() == 0) {
-        throw std::exception("No Texture Images to upload");
+        throw std::exception("Texture::Upload(): No Texture Images to upload");
     }
 
     Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
@@ -82,7 +81,6 @@ void Texture::Upload(CommandList& command_list)
 
     // Upload data and update resource state
     command_list.UploadBufferData(required_size, m_resource.Get(), subresources.size(), subresources.data());
-    TransitionResourceState(command_list, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 }
 
 void Texture::Read(const std::wstring& file_name)
@@ -90,7 +88,7 @@ void Texture::Read(const std::wstring& file_name)
     std::filesystem::path file_path(file_name);
 
     if (!std::filesystem::exists(file_path))
-        throw std::exception("File not found");
+        throw std::exception("Texture::Read(): File not found");
 
     if (file_path.extension() == ".dds")
         ThrowIfFailed(DirectX::LoadFromDDSFile(file_name.c_str(), DirectX::DDS_FLAGS_FORCE_RGB, &m_metadata, m_image));
@@ -166,9 +164,8 @@ void DepthMapTexture::ClearDepthStencil(CommandList& command_list)
 // set static samplers
 std::unique_ptr<DescriptorHeap> TextureLibrary::s_sampler_heap = TextureLibrary::CreateSamplers();
 
-// TODO: where to perform the resource barrier to pixel shader resource state? currently done here, so command queue is of type D3D12_COMMAND_LIST_TYPE_DIRECT
 TextureLibrary::TextureLibrary() :
-    m_command_queue(CommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT)),
+    m_command_queue(CommandQueue(D3D12_COMMAND_LIST_TYPE_COPY)),
     m_srv_heap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV),
     m_rtv_heap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV),
     m_dsv_heap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV),
@@ -211,7 +208,7 @@ void TextureLibrary::Bind(FrameDescriptorHeap* descriptor_heap)
 void TextureLibrary::Bind(FrameDescriptorHeap* descriptor_heap, unsigned int frame_idx) 
 {
     if (descriptor_heap->GetHeapType() != D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV || !descriptor_heap->IsShaderVisible())
-        throw std::exception("Binding illegal frame descriptor heap");
+        throw std::exception("TextureLibrary::Bind(): Frame descriptor heap is not of correct type or visible to shader");
 
     // Binding all textures with ShaderResourceView
     for (auto& [name, texture] : m_srv_texture_map) {

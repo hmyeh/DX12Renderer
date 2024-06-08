@@ -9,10 +9,12 @@
 #include "commandlist.h"
 
 
+
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 
-GUI::GUI(HWND hWnd) : m_img_options{2.2f, 1.0f}, m_initialized(false)
+GUI::GUI(HWND hWnd) : 
+	m_img_options(nullptr), m_initialized(false)
 {
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
@@ -63,13 +65,16 @@ void GUI::Render(CommandList& command_list)
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 
-	ImGui::Begin("Options");
+	if (m_img_options)
+	{
+		ImGui::Begin("Options");
 
-	ImGui::Text("Image Effect Options");
-	ImGui::SliderFloat("gamma", &m_img_options.gamma, 0.1f, 5.0f);
-	ImGui::SliderFloat("exposure", &m_img_options.exposure, 0.1f, 5.0f);
+		ImGui::Text("Image Effect Options");
+		ImGui::SliderFloat("gamma", &m_img_options->gamma, 0.1f, 5.0f);
+		ImGui::SliderFloat("exposure", &m_img_options->exposure, 0.1f, 5.0f);
 
-	ImGui::End();
+		ImGui::End();
+	}
 
 	// Rendering
 	// (Your code clears your framebuffer, renders your other stuff etc.)

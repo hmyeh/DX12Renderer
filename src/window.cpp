@@ -3,7 +3,6 @@
 #include <cassert>
 
 
-
 const wchar_t* Window::s_window_class_name = L"renderer";
 
 Window::Window(HINSTANCE hInstance, const wchar_t* instance_name, uint32_t width, uint32_t height, std::function<LRESULT CALLBACK(HWND, UINT, WPARAM, LPARAM)> WndProc, bool fullscreen) : 

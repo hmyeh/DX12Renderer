@@ -5,9 +5,6 @@
 
 #include <map>
 
-// Due to Windows.h import
-#define NOMINMAX
-
 // Forward declarations
 class IResourceType;
 class IShaderResource;
@@ -40,7 +37,6 @@ public:
     void Allocate(unsigned int num_descriptors);
 
     // TODO: Add checks if not yet allocated
-    // get descriptor heap 
     D3D12_CPU_DESCRIPTOR_HANDLE GetCpuHandle(unsigned int offset = 0) {
         return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_descriptor_heap->GetCPUDescriptorHandleForHeapStart(), offset * m_descriptor_size);
     }
@@ -57,7 +53,7 @@ public:
 
 class DescriptorHeap : public IDescriptorHeap {
 private:
-    // map to bookkeep what pointer texture/renderbuffer/depthbuffer is bound at address unsigned int in the descriptorheap
+    // Keep track of the bound resource descriptors for debugging
     std::vector<GpuResource*> m_resource_descriptors;
 
 public:
@@ -65,7 +61,8 @@ public:
     DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE heap_type, unsigned int num_descriptors, bool shader_visible = false) : IDescriptorHeap(heap_type, num_descriptors, shader_visible) {}
 
     D3D12_GPU_DESCRIPTOR_HANDLE FindResourceHandle(GpuResource* resource);
-    // TODO: find real next bind index based on inserted values that have not yet been released
+
+    // Bind each resource type to the descriptor heap
     unsigned int Bind(Texture* texture);
     unsigned int Bind(RenderTargetTexture* texture);
     unsigned int Bind(DepthMapTexture* texture);
@@ -75,13 +72,13 @@ public:
     void Reset()  { m_resource_descriptors.clear(); }
 };
 
-// Special descriptorheap for cbv srv uav for per frame stuff
+// Special per frame descriptorheap for Constant buffers, Shader Resources and Unordered Access views
 class FrameDescriptorHeap : public IDescriptorHeap { 
 private:
     unsigned int m_num_frames;
     unsigned int m_num_frame_descriptors;
 
-    // Specifically for IMGUI so idont have problems when resetting bookkeeping...
+    // Store imgui descriptors separately
     unsigned int m_num_gui_descriptors;
     std::vector<GpuResource*> m_gui_descriptors;
 
@@ -100,11 +97,11 @@ public:
     
     D3D12_GPU_DESCRIPTOR_HANDLE FindResourceHandle(IResourceType* resource, unsigned int frame_idx);
     
+    // IMGUI slots reserved at start, then normal srv slots
     unsigned int Bind(IShaderResource* shader_resource, unsigned int frame_idx);
     unsigned int Bind(UploadBuffer* constant_buffer, unsigned int frame_idx);// UploadBuffer used as ConstantBuffer
 
-
-    // For Imgui to reserve srv slots // IMGUI slots reserved at start, then normal srv slots
+    // Imgui specific methods
     unsigned int Bind(ImguiResource* resource);
     D3D12_CPU_DESCRIPTOR_HANDLE GetImguiCpuHandle(unsigned int offset = 0) {
         return IDescriptorHeap::GetCpuHandle(offset);

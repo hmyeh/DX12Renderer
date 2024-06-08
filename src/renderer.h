@@ -56,6 +56,7 @@ private:
     // Can be toggled with the V key.
     bool m_vsync = true;
     bool m_tearing_supported = false;
+    bool m_initialized;
 
     Scene* m_scene;
     Camera m_camera;
@@ -84,6 +85,10 @@ public:
 
     void Resize(uint32_t width, uint32_t height);
     void ToggleVsync() { m_vsync = !m_vsync; }
+
+private:
+    void BindGuiData();
+    void SetupPipelines();
 };
 
 

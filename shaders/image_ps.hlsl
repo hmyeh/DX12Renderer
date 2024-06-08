@@ -17,7 +17,6 @@ struct PSInput {
 float4 main(PSInput IN) : SV_Target
 {
 	float inv_gamma = 1.0 / gamma;
-	//float exposure = 1.0;
 
     float4 color = screenMap.Sample(sampleWrap, IN.TextureCoord);
 	// Simple exposure Tone mapping HDR

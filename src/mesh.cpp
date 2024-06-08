@@ -104,7 +104,7 @@ Mesh Mesh::ReadFile(std::string file_name, TextureLibrary* texture_library) {
     if (materials.empty())
         throw std::exception("No material applied to mesh");
     // Create texture for materials (only using first material)
-    Texture* diffuse_tex = texture_library->CreateTexture(to_wstring(resource_path + materials[0].diffuse_texname));
+    Texture* diffuse_tex = texture_library->CreateTexture(CastToWString(resource_path + materials[0].diffuse_texname));
 
     // Lesser compare function to create set of tinyobj::index_t
     auto comp = [](const tinyobj::index_t& i1, const tinyobj::index_t& i2) {
@@ -147,10 +147,20 @@ Mesh Mesh::ReadFile(std::string file_name, TextureLibrary* texture_library) {
         }
     }
 
-    return Mesh(vertices, indices, diffuse_tex);
+    return Mesh(vertices, indices, { diffuse_tex });
 }
 
-void Mesh::ComputeBounds() {
+D3D12_GPU_DESCRIPTOR_HANDLE Mesh::GetDiffuseTextureDescriptor(unsigned int frame_idx) const { return m_textures[0]->GetShaderGPUHandle(frame_idx); }
+
+std::vector<D3D12_GPU_DESCRIPTOR_HANDLE> Mesh::GetTextureDescriptors(unsigned int frame_idx) const
+{
+    std::vector<D3D12_GPU_DESCRIPTOR_HANDLE> gpu_handles;
+    std::transform(m_textures.begin(), m_textures.end(), gpu_handles.begin(), [&frame_idx](Texture* tex) { return tex->GetShaderGPUHandle(frame_idx); });
+    return gpu_handles;
+}
+
+void Mesh::ComputeBounds() 
+{
     constexpr float min_fl = std::numeric_limits<float>::min();
     constexpr float max_fl = std::numeric_limits<float>::max();
     DirectX::XMVECTOR min_bounds = DirectX::XMVectorSet(max_fl, max_fl, max_fl, 1.0f);

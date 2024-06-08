@@ -8,13 +8,13 @@
 
 void GpuResource::TransitionResourceState(CommandList& command_list, D3D12_RESOURCE_STATES updated_state) {
     if (updated_state == m_resource_state)
-        throw std::exception("Transition to same state..");
+        return;
+
     command_list.ResourceBarrier(m_resource.Get(), m_resource_state, updated_state);
-    m_resource_state = updated_state; // state should only actually change after execution of the command list....
+    m_resource_state = updated_state; // state should only actually change after execution of the command list
 }
 
 // IShader Resource
-
 IShaderResource::IShaderResource() : m_shader_visible_cpu_handles(Renderer::s_num_frames), m_shader_visible_gpu_handles(Renderer::s_num_frames), m_srv_handle{}  {}
 
 void IShaderResource::CreateShaderResourceView(ID3D12Resource* resource, const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_SHADER_RESOURCE_VIEW_DESC* desc)
@@ -70,7 +70,7 @@ void IConstantBufferResource::CreateConstantBufferView(ID3D12Resource* resource,
 
         D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc = {};
         cbv_desc.BufferLocation = resource->GetGPUVirtualAddress();
-        cbv_desc.SizeInBytes = buffer_size;    // CB size is required to be 256-byte aligned.
+        cbv_desc.SizeInBytes = CastToUint(buffer_size);    // CB size is required to be 256-byte aligned.
 
         device->CreateConstantBufferView(&cbv_desc, handle);
         m_cbv_cpu_handle = handle;

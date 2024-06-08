@@ -2,7 +2,6 @@
 
 #include "tinyxml2/tinyxml2.h"
 
-#include <stdlib.h>
 
 #include "buffer.h"
 #include "mesh.h"
@@ -13,7 +12,6 @@
 Scene::Scene() :
 	m_command_queue(CommandQueue(D3D12_COMMAND_LIST_TYPE_COPY)), m_directional_light(&m_texture_library)
 {
-    srand(time(NULL));
 }
 
 Scene::~Scene() 
@@ -33,42 +31,35 @@ void Scene::LoadResources() {
     CreateSceneBuffer();
 }
 
-void Scene::Update(unsigned int frame_idx, const Camera& camera) {
+void Scene::Update(unsigned int frame_idx, const Camera& camera) 
+{
     //update scene constant buffer // needs to be transposed since row major directxmath and col major hlsl
     m_scene_consts[frame_idx].view = DirectX::XMMatrixTranspose(camera.GetViewMatrix());
     m_scene_consts[frame_idx].projection = DirectX::XMMatrixTranspose(camera.GetProjectionMatrix());
     m_scene_consts[frame_idx].camera_position = camera.GetPosition();
 
-    // TODO: update lights
+    // update lights
     DirectX::XMFLOAT3 min_bounds, max_bounds;
     ComputeBoundingBox(min_bounds, max_bounds);
     m_directional_light.Update(min_bounds, max_bounds);
     m_scene_consts[frame_idx].directional_light = m_directional_light.GetLightData();
 
-    m_items[0].position.x = sin(rand() % 10);
-
     // copy our ConstantBuffer instance to the mapped constant buffer resource
     memcpy(m_scene_consts_buffer_WO[frame_idx], &m_scene_consts[frame_idx], sizeof(SceneConstantBuffer));
 }
 
-void Scene::Bind(FrameDescriptorHeap* descriptor_heap) {// Note: could cache the descriptorheap pointer if needed not currently done
+void Scene::Bind(FrameDescriptorHeap* descriptor_heap) 
+{
     if (!descriptor_heap->IsShaderVisible())
-        throw std::exception("The descriptor heap to bind to is not shader visible");
+        throw std::exception("Scene::Bind(): Descriptor heap is not visible to the shaders");
 
     if (descriptor_heap->GetHeapType() != D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)
-        throw std::exception("The descriptor heap is not of the right type");
+        throw std::exception("Scene::Bind(): Incorrect descriptor heap type");
 
     for (int i = 0; i < Renderer::s_num_frames; ++i)
     {
         // Bind all textures for each frame
         m_texture_library.Bind(descriptor_heap, i);
-
-        // Cache the handles to each texture for the scene items
-        for (auto& scene_item : m_items) {
-            for (const auto& tex : scene_item.mesh.GetTextures()) {
-                scene_item.resource_handles[i].push_back(descriptor_heap->FindResourceHandle(tex, i));
-            }
-        }
 
         // Describe and create the scene constant buffer view (CBV) and cache the GPU descriptor handle
         descriptor_heap->Bind(&m_scene_constant_buffers[i], i);

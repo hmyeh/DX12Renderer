@@ -24,12 +24,6 @@ Application::Application(HINSTANCE hInstance, const wchar_t* instance_name, uint
 
     m_renderer = std::unique_ptr<Renderer>(new Renderer(m_window->GetWindowHandle(), width, height, m_scene.get(), m_gui.get(), use_warp));
 
-    
-
-
-    // Bind scene for descriptor heap
-    //m_renderer->Bind(m_scene.get());
-
     m_initialized = true;
 }
 
@@ -48,7 +42,7 @@ LRESULT CALLBACK Application::WndProc(HWND hwnd, UINT message, WPARAM wParam, LP
     switch (message)
     {
     case WM_PAINT:
-        update();
+        Update();
         m_renderer->Render();
         break;
     case WM_SYSKEYDOWN:
@@ -98,7 +92,7 @@ LRESULT CALLBACK Application::WndProc(HWND hwnd, UINT message, WPARAM wParam, LP
 }
 
 
-void Application::update()
+void Application::Update()
 {
     static uint64_t frameCounter = 0;
     static double elapsedSeconds = 0.0;
@@ -121,6 +115,4 @@ void Application::update()
         frameCounter = 0;
         elapsedSeconds = 0.0;
     }
-
-    //m_scene->GetSceneItems()[0].position = ;
 }

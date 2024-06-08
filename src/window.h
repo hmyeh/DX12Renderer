@@ -1,22 +1,11 @@
 #pragma once
 
-#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 //// In order to define a function called CreateWindow, the Windows macro needs to
 //// be undefined.
 #if defined(CreateWindow)
 #undef CreateWindow
-#endif
-
-// The min/max macros conflict with like-named member functions.
-// Only use std::min and std::max defined in <algorithm>.
-#if defined(min)
-#undef min
-#endif
-
-#if defined(max)
-#undef max
 #endif
 
 #include <functional>
@@ -49,16 +38,16 @@ public:
     void RegisterWindowClass(HINSTANCE hInst);
     HWND CreateWindow(HINSTANCE hInst, const wchar_t* windowTitle, uint32_t width, uint32_t height);
 
-    HWND GetWindowHandle() { return m_hWnd; }
+    HWND GetWindowHandle() const { return m_hWnd; }
 
-    uint32_t GetWidth() { return m_width; }
-    uint32_t GetHeight() { return m_height; }
+    uint32_t GetWidth() const { return m_width; }
+    uint32_t GetHeight() const { return m_height; }
 
     // Don't allow 0 size swap chain back buffers.
     void SetWidth(uint32_t width) { m_width = std::max(1u, width); }
     void SetHeight(uint32_t height) { m_height = std::max(1u, height); }
 
-    bool IsFullscreen() { return m_fullscreen; }
+    bool IsFullscreen() const { return m_fullscreen; }
 
     //
     void Show();

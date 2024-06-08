@@ -15,14 +15,14 @@ Renderer::Renderer(HWND hWnd, uint32_t width, uint32_t height, Scene* scene, GUI
     m_render_target_format(DXGI_FORMAT_R8G8B8A8_UNORM),
     m_depth_stencil_format(DXGI_FORMAT_D32_FLOAT),
     m_camera(width, height),
-    //m_scene(scene),
     m_gui(gui),
     m_width(width),
     m_height(height),
     m_command_queue(D3D12_COMMAND_LIST_TYPE_DIRECT),
     m_rtv_descriptor_heap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, s_num_frames),
     m_dsv_descriptor_heap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1u),
-    m_cbv_srv_descriptor_heap(s_num_frames, gui->GetNumResources())
+    m_cbv_srv_descriptor_heap(s_num_frames, gui->GetNumResources()),
+    m_initialized(false)
 {
     m_tearing_supported = directx::CheckTearingSupport();
 
@@ -33,7 +33,7 @@ Renderer::Renderer(HWND hWnd, uint32_t width, uint32_t height, Scene* scene, GUI
     m_current_backbuffer_idx = m_swap_chain->GetCurrentBackBufferIndex();
 
     // Create the size dependent resources
-    LoadSizeDependentResources(m_width, m_height);
+    LoadSizeDependentResources(width, height);
 
     // Create the descriptors for the render target textures
     m_texture_library.AllocateDescriptors();
@@ -41,17 +41,34 @@ Renderer::Renderer(HWND hWnd, uint32_t width, uint32_t height, Scene* scene, GUI
     Bind(scene);
     
     // Initialize Pipelines
-    m_depthmap_pipeline.Init(&m_cbv_srv_descriptor_heap, m_scene);
-    m_scene_pipeline.Init(&m_cbv_srv_descriptor_heap, width, height, m_scene, &m_camera);
-    m_img_pipeline.Init(&m_command_queue, &m_cbv_srv_descriptor_heap, width, height, m_gui->GetImageOptions());
+    SetupPipelines();
 
-    // Set the input texture for the image pipeline
-    for (int i = 0; i < s_num_frames; ++i)
-        m_img_pipeline.SetInputTexture(i, m_render_textures[i]);
+    // Bind gui data
+    BindGuiData();
+
+    m_initialized = true;
 }
 
 Renderer::~Renderer() {
     m_command_queue.Flush();
+}
+
+void Renderer::BindGuiData()
+{
+    // Set Gui pointers
+    m_gui->SetImageOptions(m_img_pipeline.GetOptions());
+}
+
+void Renderer::SetupPipelines()
+{
+    // Initialize Pipelines
+    m_depthmap_pipeline.Init(&m_cbv_srv_descriptor_heap, m_scene);
+    m_scene_pipeline.Init(&m_cbv_srv_descriptor_heap, m_width, m_height, m_scene, &m_camera);
+    m_img_pipeline.Init(&m_command_queue, &m_cbv_srv_descriptor_heap, m_width, m_height);
+
+    // Set the input texture for the image pipeline
+    for (int i = 0; i < s_num_frames; ++i)
+        m_img_pipeline.SetInputTexture(i, m_render_textures[i]);
 }
 
 // Singleton device
@@ -100,7 +117,7 @@ void Renderer::Render()
 {
     // Scene needs to be bound before rendering
     if (!m_scene)
-        throw std::exception("No scene is bound to the renderer");
+        throw std::exception("Renderer::Render(): No scene is bound to the renderer");
 
     RenderBuffer& backbuffer = m_backbuffers[m_current_backbuffer_idx];
     CommandList command_list = m_command_queue.GetCommandList();
@@ -157,12 +174,19 @@ void Renderer::LoadSizeDependentResources(unsigned int width, unsigned int heigh
     for (int i = 0; i < s_num_frames; ++i)
     {
         m_backbuffers[i].Create(m_swap_chain, i);
-        m_rtv_descriptor_heap.Bind(&m_backbuffers[i]);
+        if (!m_initialized)
+            m_rtv_descriptor_heap.Bind(&m_backbuffers[i]);
     }
 
     // Create depth stencil buffer
-    m_depth_buffer.Create(m_depth_stencil_format, width, height);
-    m_dsv_descriptor_heap.Bind(&m_depth_buffer);
+    if (m_initialized) {
+        m_depth_buffer.Resize(width, height);
+    }
+    else {
+        m_depth_buffer.Create(m_depth_stencil_format, width, height);
+        m_dsv_descriptor_heap.Bind(&m_depth_buffer);
+    }
+    
 
     for (int i = 0; i < s_num_frames; ++i)
     {
@@ -175,6 +199,9 @@ void Renderer::LoadSizeDependentResources(unsigned int width, unsigned int heigh
     // Resize pipelines
     m_scene_pipeline.Resize(width, height);
     m_img_pipeline.Resize(width, height);
+
+    // Camera aspect ratio resize
+    m_camera.Resize(width, height);
 }
 
 
@@ -198,7 +225,7 @@ void Renderer::Resize(uint32_t width, uint32_t height)
     // Resize backbuffers (renderbuffers)
     DXGI_SWAP_CHAIN_DESC swapchain_desc = {};
     ThrowIfFailed(m_swap_chain->GetDesc(&swapchain_desc));
-    HRESULT hr = m_swap_chain->ResizeBuffers(s_num_frames, width, height, swapchain_desc.BufferDesc.Format, swapchain_desc.Flags);
+    ThrowIfFailed(m_swap_chain->ResizeBuffers(s_num_frames, width, height, swapchain_desc.BufferDesc.Format, swapchain_desc.Flags));
 
     // Update backbuffer index
     m_current_backbuffer_idx = m_swap_chain->GetCurrentBackBufferIndex();

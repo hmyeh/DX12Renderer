@@ -1,4 +1,3 @@
-#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <shellapi.h> // For CommandLineToArgvW
 
@@ -38,14 +37,14 @@ void ParseCommandLineArguments()
 }
 
 
-int CALLBACK wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLine, int nCmdShow)
+int CALLBACK wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR lpCmdLine, _In_ int nCmdShow)
 {
     ParseCommandLineArguments();
     
     // Initialize required for DirectXTex library https://github.com/microsoft/DirectXTex/wiki/DirectXTex
     ThrowIfFailed(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
 
-    Application app(hInstance, L"instance name", g_ClientWidth, g_ClientHeight);
+    Application app(hInstance, L"DX12 Renderer", g_ClientWidth, g_ClientHeight);
     app.Show();
 
     return 0;

@@ -1,6 +1,6 @@
 #include "utility.h"
 
-std::wstring to_wstring(std::string str)
+std::wstring CastToWString(std::string str)
 {
     // overestimate number of code points
     std::wstring wstr(str.size() + 1, L' ');

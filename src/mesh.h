@@ -1,6 +1,5 @@
 #pragma once
 
-#define NOMINMAX
 #include <d3d12.h>
 #include <DirectXMath.h>
 #include <wrl.h>
@@ -59,7 +58,7 @@ public:
 
 class Skybox : public IMesh<Vertex> {
 private:
-    // TODO: fix the vertices.... and indices...? https://stackoverflow.com/questions/25482159/normal-vectors-for-an-eight-vertex-cube
+    // TODO: fix the vertices and indices https://stackoverflow.com/questions/25482159/normal-vectors-for-an-eight-vertex-cube
     static const std::vector<Vertex> vertices;
     static const std::vector<uint32_t> indices;
 
@@ -76,7 +75,7 @@ struct MaterialParams {
 
 class Mesh : public IMesh<Vertex> {
 private:
-    Texture* m_diffuse_tex;
+    std::vector<Texture*> m_textures;
     MaterialParams m_mat_params;
 
     // Cache bounds of Mesh
@@ -84,13 +83,15 @@ private:
     DirectX::XMFLOAT4 m_max_bounds;
 
 public:
-    Mesh(const std::vector<Vertex>& verts, const std::vector<uint32_t>& inds, Texture* diffuse_tex) : 
-        m_diffuse_tex(diffuse_tex), m_mat_params{0.0f, 0.25f}, IMesh<Vertex>(verts, inds)
+    Mesh(const std::vector<Vertex>& verts, const std::vector<uint32_t>& inds, const std::vector<Texture*>& textures) :
+        m_textures(textures), m_mat_params{0.0f, 0.25f}, IMesh<Vertex>(verts, inds)
     {
         ComputeBounds();
     }
 
-    std::vector<Texture*> GetTextures() { return { m_diffuse_tex }; }
+    std::vector<Texture*> GetTextures() { return m_textures; }//{ m_diffuse_tex }; }
+    D3D12_GPU_DESCRIPTOR_HANDLE GetDiffuseTextureDescriptor(unsigned int frame_idx) const;
+    std::vector<D3D12_GPU_DESCRIPTOR_HANDLE> GetTextureDescriptors(unsigned int frame_idx) const;
     const MaterialParams* GetMaterial() const { return &m_mat_params; }
 
     void GetBounds(DirectX::XMFLOAT4& min_bounds, DirectX::XMFLOAT4& max_bounds) const { min_bounds = m_min_bounds; max_bounds = m_max_bounds; }

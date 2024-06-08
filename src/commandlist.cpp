@@ -47,6 +47,8 @@ void CommandList::SetRenderTargets(const std::vector<IRenderTarget*>& render_tar
 {
 	D3D12_CPU_DESCRIPTOR_HANDLE rtv_handle{};
 	D3D12_CPU_DESCRIPTOR_HANDLE dsv_handle{};
+
+	// TODO: currently only single render target is used
 	if (!render_target_views.empty() && render_target_views[0]) {
 		rtv_handle = render_target_views[0]->GetRenderTargetHandle();
 	}

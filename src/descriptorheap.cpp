@@ -46,8 +46,7 @@ D3D12_GPU_DESCRIPTOR_HANDLE DescriptorHeap::FindResourceHandle(GpuResource* reso
     auto result = std::find(m_resource_descriptors.begin(), m_resource_descriptors.end(), resource);
     if (result == m_resource_descriptors.end())
         throw std::exception("Resource not contained in descriptor heap");
-    unsigned int bind_idx = result - m_resource_descriptors.begin();
-
+    unsigned int bind_idx = CastToUint(result - m_resource_descriptors.begin());
     return GetGpuHandle(bind_idx);
 }
 
@@ -180,7 +179,7 @@ D3D12_GPU_DESCRIPTOR_HANDLE FrameDescriptorHeap::FindResourceHandle(IResourceTyp
     if (result == descriptors.end())
         throw std::exception("Resource not contained in descriptor heap");
 
-    unsigned int bind_idx = result - descriptors.begin();
+    unsigned int bind_idx = CastToUint(result - descriptors.begin());
     return GetGpuHandle(frame_idx, bind_idx);
 
 }
@@ -225,7 +224,7 @@ unsigned int FrameDescriptorHeap::Bind(ImguiResource* resource)
     if (gui_bind_idx >= m_num_gui_descriptors)
         throw std::exception("Already reached max amount of descriptors in heap");
 
-    unsigned int bind_idx = gui_bind_idx + m_num_frames * m_num_frame_descriptors;
+    unsigned int bind_idx = gui_bind_idx;
 
     // Cache in map that resource is bound at bind_idx
     m_gui_descriptors.push_back(dynamic_cast<GpuResource*>(resource));

@@ -7,13 +7,9 @@
 #include <queue>
 #include "commandlist.h"
 
-#if defined(max)
-#undef max
-#endif
-
 
 class CommandQueue {
-public:
+private:
 	// Keep track of command allocators that are "in-flight"
 	struct CommandAllocatorEntry
 	{
@@ -34,12 +30,10 @@ public:
 	CommandAllocatorQueue m_command_allocator_queue;
 	std::queue<CommandList> m_command_list_queue;
 
+public:
 	CommandQueue(D3D12_COMMAND_LIST_TYPE type);
 
-	//virtual ~CommandQueue() {}
-
 	CommandList GetCommandList();
-
 	uint64_t ExecuteCommandList(CommandList& command_list);
 	
 	uint64_t Signal();

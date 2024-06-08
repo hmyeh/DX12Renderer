@@ -26,17 +26,19 @@ public:
 
     // create the resource
     // depth = arraysize
-    void Create(D3D12_RESOURCE_DIMENSION dimension, DXGI_FORMAT format, uint32_t width, uint32_t height, uint32_t depth, uint32_t mip_levels, const D3D12_CLEAR_VALUE& clear_value, bool use_clear_value = false, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
+    void Create(D3D12_RESOURCE_DIMENSION dimension, DXGI_FORMAT format, uint32_t width, uint32_t height, uint32_t depth, uint32_t mip_levels, 
+        const D3D12_CLEAR_VALUE& clear_value, bool use_clear_value = false, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
 
     virtual void CreateShaderResourceView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_SHADER_RESOURCE_VIEW_DESC* desc = nullptr) { IShaderResource::CreateShaderResourceView(m_resource.Get(), handle, desc); }
     
-    virtual void Resize(unsigned int width, unsigned int height) {
+    virtual void Resize(unsigned int width, unsigned int height) 
+    {
         Destroy();
         Create(m_resource_desc.Dimension, m_resource_desc.Format, width, height, m_resource_desc.DepthOrArraySize, m_resource_desc.MipLevels, m_clear_value, m_use_clear_value, m_flags);
         IShaderResource::ResourceChanged(m_resource.Get());
     }
 
-    // Needs method to use as SRV after being used as rendertarget
+    // Change resource state to pixel shader resource
     void UseShaderResource(CommandList& command_list) {  TransitionResourceState(command_list, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE); }
 };
 
@@ -83,7 +85,8 @@ public:
 public:
     virtual void ClearDepthStencil(CommandList& command_list) override;
 
-    virtual void CreateShaderResourceView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_SHADER_RESOURCE_VIEW_DESC* desc = nullptr) override {
+    virtual void CreateShaderResourceView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_SHADER_RESOURCE_VIEW_DESC* desc = nullptr) override 
+    {
         DXGI_FORMAT shader_format = IDepthStencilTarget::TypelessToShaderFormat(m_resource_desc.Format);
         // Create the depth-stencil view.
         if (desc) {
@@ -116,7 +119,8 @@ public:
         }
     }
 
-    void CreateDepthStencilView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_DEPTH_STENCIL_VIEW_DESC* desc = nullptr) {
+    void CreateDepthStencilView(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, D3D12_DEPTH_STENCIL_VIEW_DESC* desc = nullptr) 
+    {
         DXGI_FORMAT dsv_format = IDepthStencilTarget::TypelessToDepthStencilFormat(m_resource_desc.Format);
 
         // Create the depth-stencil view.
@@ -149,7 +153,7 @@ public:
 };
 
 class TextureLibrary {
-public:
+private:
     // for allocating the texture descriptors of different types (non-shader visible)
     DescriptorHeap m_srv_heap;
     DescriptorHeap m_rtv_heap;
@@ -168,11 +172,9 @@ public:
     // Cache Framedescriptorheap bound
     FrameDescriptorHeap* m_frame_descriptor_heap;
 
+public:
     TextureLibrary();
-
-    ~TextureLibrary() {
-        m_command_queue.Flush();
-    }
+    ~TextureLibrary() { m_command_queue.Flush(); }
 
     // Lazily allocate the descriptors
     void AllocateDescriptors();
@@ -184,13 +186,12 @@ public:
     RenderTargetTexture* CreateRenderTargetTexture(DXGI_FORMAT format, uint32_t width, uint32_t height);
     DepthMapTexture* CreateDepthTexture(DXGI_FORMAT format, uint32_t width, uint32_t height);
 
-
     // Loading all textures to GPU at once
     void Load();
 
     size_t GetNumTextures() const { return m_srv_texture_map.size() + m_rtv_textures.size() + m_dsv_textures.size(); }
 
-    //void Flush() { m_command_queue.Flush(); }
+    void Flush() { m_command_queue.Flush(); }
 
     void Reset();
 

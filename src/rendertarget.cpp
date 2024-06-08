@@ -39,9 +39,10 @@ void IDepthStencilTarget::ResourceChanged(ID3D12Resource* resource)
 
 
 // RenderBuffer
-void RenderBuffer::Create(const Microsoft::WRL::ComPtr<IDXGISwapChain4>& swap_chain, unsigned int frame_idx) {
+void RenderBuffer::Create(const Microsoft::WRL::ComPtr<IDXGISwapChain4>& swap_chain, unsigned int frame_idx) 
+{
     if (frame_idx > Renderer::s_num_frames)
-        throw std::exception("Illegal too high framecount");
+        throw std::exception("RenderBuffer::Create(): Out of frame index range");
 
     Microsoft::WRL::ComPtr<ID3D12Device2> device = Renderer::GetDevice();
 
@@ -50,8 +51,8 @@ void RenderBuffer::Create(const Microsoft::WRL::ComPtr<IDXGISwapChain4>& swap_ch
     m_resource_state = D3D12_RESOURCE_STATE_PRESENT;
     m_resource->SetName(L"Render Buffer");
 
-    // specfciaaly how render buffer needs to be resized
-    if (m_rtv_handle.ptr) // this means it was already bound
+    // Specifically due to how render buffer needs to be resized
+    if (m_rtv_handle.ptr) // Check if it was already bound
         IRenderTarget::ResourceChanged(m_resource.Get());
 }
 
@@ -92,6 +93,7 @@ void DepthBuffer::Create(DXGI_FORMAT format, uint32_t width, uint32_t height)
     m_resource->SetName(L"Depth Stencil Buffer");
 }
 
-void DepthBuffer::ClearDepthStencil(CommandList& command_list) {
+void DepthBuffer::ClearDepthStencil(CommandList& command_list) 
+{
     command_list.ClearDepthStencilView(m_dsv_handle, IDepthStencilTarget::s_clear_value.Depth);
 }

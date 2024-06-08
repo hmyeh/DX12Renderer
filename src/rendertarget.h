@@ -8,7 +8,7 @@
 
 #include "buffer.h"
 
-// Interface for rendertargets
+// Class to deal with Render Target descriptors
 class IRenderTarget : public IResourceType {
 protected:
     D3D12_CPU_DESCRIPTOR_HANDLE m_rtv_handle;
@@ -19,10 +19,12 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetRenderTargetHandle() const { return m_rtv_handle; }
     virtual void ClearRenderTarget(CommandList& command_list) = 0;
     
-    // in case resource has been reset and recreated for resize
+    // Used in case resource has been reset and recreated for resize
     void ResourceChanged(ID3D12Resource* resource);
 };
 
+
+// Class to deal with Depth stencil descriptors
 class IDepthStencilTarget : public IResourceType {
 protected:
     static const std::array<DXGI_FORMAT, 5> s_valid_formats;
@@ -35,7 +37,7 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilHandle() const { return m_dsv_handle; }
     virtual void ClearDepthStencil(CommandList& command_list) = 0;
 
-    // in case resource has been reset and recreated for resize
+    // Used in case resource has been reset and recreated for resize
     void ResourceChanged(ID3D12Resource* resource);
 
     static bool IsValidFormat(DXGI_FORMAT format) { return std::find(s_valid_formats.begin(), s_valid_formats.end(), format) != s_valid_formats.end(); }
@@ -48,12 +50,12 @@ public:
         case DXGI_FORMAT_R32_TYPELESS:
             dsv_format = DXGI_FORMAT_R32_FLOAT;
             break;
-        case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
-            dsv_format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS; // ?
-            break;
-        case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
-            dsv_format = DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS; // ?
-            break;
+        //case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
+        //    dsv_format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS; // ?
+        //    break;
+        //case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
+        //    dsv_format = DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS; // ?
+            //break;
         case DXGI_FORMAT_R16_TYPELESS:
             dsv_format = DXGI_FORMAT_R16_FLOAT;
             break;
@@ -70,12 +72,12 @@ public:
         case DXGI_FORMAT_R32_TYPELESS:
             dsv_format = DXGI_FORMAT_D32_FLOAT;
             break;
-        case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
-            dsv_format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-            break;
-        case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
-            dsv_format = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
-            break;
+        //case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
+        //    dsv_format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        //    break;
+        //case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
+        //    dsv_format = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+        //    break;
         case DXGI_FORMAT_R16_TYPELESS:
             dsv_format = DXGI_FORMAT_D16_UNORM;
             break;
@@ -96,8 +98,6 @@ public:
     void Create(const Microsoft::WRL::ComPtr<IDXGISwapChain4>& swap_chain, unsigned int frame_idx);
     uint64_t GetFenceValue() const { return m_fence_value; }
     void SetFenceValue(uint64_t updated_fence_value) {
-        //if (updated_fence_value < m_fence_value)
-        //    throw std::exception("this should not be happening");
         m_fence_value = updated_fence_value;
     }
 

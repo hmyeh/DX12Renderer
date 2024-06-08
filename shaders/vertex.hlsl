@@ -2,7 +2,8 @@
 
 #include "scenebuffer.hlsli"
 
-float3x3 inverse(float3x3 m) {
+float3x3 inverse(float3x3 m) 
+{
     // computes the inverse of a matrix m
     float det = m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2]) -
         m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
